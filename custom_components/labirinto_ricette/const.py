@@ -18,7 +18,8 @@ DEFAULT_SITES = [
     {
         "name": "HelloFresh",
         "url": "https://www.hellofresh.it/recipes/search/?q={query}",
-        "enabled": True,
+        # carica i risultati via JavaScript: la pagina scaricata non li contiene
+        "enabled": False,
     },
     {
         "name": "Cookist",
@@ -27,7 +28,7 @@ DEFAULT_SITES = [
     },
     {
         "name": "La Cucina Italiana",
-        "url": "https://www.lacucinaitaliana.it/ricerca/?q={query}",
+        "url": "https://www.lacucinaitaliana.it/search/?q={query}",
         "enabled": True,
     },
     {
@@ -36,3 +37,8 @@ DEFAULT_SITES = [
         "enabled": False,
     },
 ]
+
+# URL predefiniti cambiati nel tempo: vengono aggiornati nelle installazioni esistenti
+OLD_SITE_URLS = {
+    "https://www.lacucinaitaliana.it/ricerca/?q={query}": "https://www.lacucinaitaliana.it/search/?q={query}",
+}

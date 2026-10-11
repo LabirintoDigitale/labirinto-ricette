@@ -11,7 +11,9 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 
 from .const import CONF_SITES, DEFAULT_SITES, DOMAIN
-from .scraper import async_search_site
+from .scraper import async_fetch_recipe, async_search_site, site_domain
+
+RECIPE_CACHE_SIZE = 50
 
 SITE_SCHEMA = vol.Schema(
     {
@@ -41,6 +43,7 @@ def async_register(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, ws_config)
     websocket_api.async_register_command(hass, ws_save_sites)
     websocket_api.async_register_command(hass, ws_test_site)
+    websocket_api.async_register_command(hass, ws_recipe)
 
 
 @websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/config"})
@@ -123,3 +126,38 @@ async def ws_test_site(
         )
         return
     connection.send_result(msg["id"], {"ok": True, "count": len(items), "results": items})
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): f"{DOMAIN}/recipe",
+        vol.Required("url"): vol.All(str, vol.Strip),
+    }
+)
+@websocket_api.async_response
+async def ws_recipe(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict
+) -> None:
+    """Ingredienti, descrizione e passaggi di una ricetta."""
+    url = msg["url"]
+    entry = _entry(hass)
+    sites = entry.options.get(CONF_SITES, DEFAULT_SITES) if entry else []
+    # Solo pagine dei siti configurati: il pannello non deve scaricare URL qualsiasi
+    if not url.startswith(("http://", "https://")) or site_domain(url) not in {
+        site_domain(s["url"]) for s in sites
+    }:
+        connection.send_error(msg["id"], "invalid_url", "Questo indirizzo non è di un sito configurato")
+        return
+    cache: dict[str, Any] = hass.data[DOMAIN].setdefault("recipes", {})
+    if url not in cache:
+        try:
+            recipe = await async_fetch_recipe(hass, url)
+        except Exception as err:  # noqa: BLE001 - riportato all'utente
+            connection.send_error(
+                msg["id"], "fetch_failed", str(err) or type(err).__name__
+            )
+            return
+        if len(cache) >= RECIPE_CACHE_SIZE:
+            cache.pop(next(iter(cache)))
+        cache[url] = recipe
+    connection.send_result(msg["id"], cache[url])

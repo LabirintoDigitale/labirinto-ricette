@@ -30,6 +30,7 @@ from .const import (
     CONF_SITES,
     DEFAULT_SITES,
     DOMAIN,
+    OLD_SITE_URLS,
     PANEL_PATH,
     PANEL_URL,
     SIGNAL_UPDATE,
@@ -131,6 +132,17 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # I siti vengono letti dalle opzioni a ogni ricerca: cambiarli non richiede reload.
+    sites = entry.options.get(CONF_SITES)
+    if sites and any(s["url"] in OLD_SITE_URLS for s in sites):
+        hass.config_entries.async_update_entry(
+            entry,
+            options={
+                **entry.options,
+                CONF_SITES: [
+                    {**s, "url": OLD_SITE_URLS.get(s["url"], s["url"])} for s in sites
+                ],
+            },
+        )
     integration = await async_get_integration(hass, DOMAIN)
     await panel_custom.async_register_panel(
         hass,

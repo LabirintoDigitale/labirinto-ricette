@@ -58,7 +58,47 @@ const STYLE = `
   .msg.err { color: var(--error-color, #db4437); }
   .empty { text-align: center; padding: 32px 16px; color: var(--secondary-text-color); }
   .empty ha-icon { --mdc-icon-size: 48px; display: block; margin-bottom: 8px; }
+  .overlay { position: fixed; inset: 0; z-index: 10; background: rgba(0,0,0,.5);
+    display: flex; align-items: center; justify-content: center; padding: 24px; box-sizing: border-box; }
+  .dlg { background: var(--card-background-color); color: var(--primary-text-color); border-radius: 16px;
+    width: 100%; max-width: 760px; max-height: 100%; display: flex; flex-direction: column; overflow: hidden;
+    box-shadow: 0 10px 40px rgba(0,0,0,.35); }
+  .dlg-head { display: flex; align-items: center; gap: 8px; padding: 12px 8px 12px 20px;
+    border-bottom: 1px solid var(--divider-color); }
+  .dlg-title { flex: 1; font-size: 20px; font-weight: 500; line-height: 1.25; }
+  .x { background: none; border: 0; cursor: pointer; color: var(--secondary-text-color); padding: 8px;
+    border-radius: 50%; display: flex; }
+  .x:hover { background: var(--secondary-background-color); }
+  .dlg-body { overflow-y: auto; padding: 0 20px 20px; }
+  .loading { padding: 48px 0; text-align: center; color: var(--secondary-text-color); }
+  .hero { display: block; width: calc(100% + 40px); margin: 0 -20px; max-height: 360px; object-fit: cover; }
+  .desc { font-size: 15px; line-height: 1.5; margin: 16px 0 8px; }
+  .meta { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+  .meta .chip { padding: 4px 12px; gap: 6px; }
+  .meta ha-icon { --mdc-icon-size: 18px; color: var(--secondary-text-color); }
+  h3 { font-size: 17px; font-weight: 500; margin: 20px 0 8px; }
+  ul.ingr { list-style: none; padding: 0; margin: 0; columns: 2 240px; column-gap: 24px; }
+  ul.ingr li { break-inside: avoid; padding: 5px 0; font-size: 15px; }
+  ul.ingr label { display: flex; gap: 10px; align-items: flex-start; cursor: pointer; }
+  ul.ingr input { margin-top: 1px; }
+  ul.ingr li.have span { font-weight: 600; }
+  ul.ingr li.done span { text-decoration: line-through; color: var(--secondary-text-color); }
+  ol.steps { padding-left: 22px; margin: 0; }
+  ol.steps li { margin-bottom: 16px; font-size: 15px; line-height: 1.55; }
+  ol.steps li::marker { font-weight: 600; color: var(--primary-color); }
+  ol.steps li.sec { list-style: none; margin-left: -22px; font-weight: 600; font-size: 16px; }
+  ol.steps p { margin: 0 0 8px; }
+  .pics { display: grid; gap: 6px; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
+  .pics img { width: 100%; aspect-ratio: 4/3; object-fit: cover; border-radius: 8px;
+    background: var(--secondary-background-color); }
+  a.btn.link { text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+  a.btn.link ha-icon { --mdc-icon-size: 18px; }
   @media (max-width: 600px) {
+    .overlay { padding: 0; }
+    .dlg { border-radius: 0; height: 100%; max-height: none; }
+    .dlg-body { padding: 0 16px 16px; }
+    .hero { width: calc(100% + 32px); margin: 0 -16px; }
+    ul.ingr { columns: 1; }
     main { padding: 12px; }
     a.item img, a.item .ph { width: 96px; height: 72px; }
     .site { flex-wrap: wrap; }
@@ -156,6 +196,7 @@ class LabirintoRicettePanel extends HTMLElement {
       this._renderSettings(main);
     }
     root.append(el("style", { textContent: STYLE }), toolbar, main);
+    if (this._overlay) root.append(this._overlay);
   }
 
   /* ---------- Ricerca ---------- */
@@ -287,6 +328,12 @@ class LabirintoRicettePanel extends HTMLElement {
 
   _item(it) {
     const a = el("a", { class: "item", href: it.url, target: "_blank", rel: "noopener noreferrer" });
+    a.addEventListener("click", (e) => {
+      // Ctrl/Cmd/clic centrale aprono comunque il sito
+      if (e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0) return;
+      e.preventDefault();
+      this._openRecipe(it);
+    });
     if (it.image) {
       a.append(el("img", { src: it.image, loading: "lazy", referrerPolicy: "no-referrer", alt: "" }));
     } else {
@@ -296,6 +343,104 @@ class LabirintoRicettePanel extends HTMLElement {
       el("div", { class: "t", textContent: it.title }),
       el("div", { class: "s", textContent: it.site })));
     return a;
+  }
+
+  /* ---------- Finestra della ricetta ---------- */
+
+  async _openRecipe(it) {
+    this._closeRecipe();
+    const body = el("div", { class: "dlg-body" }, el("div", { class: "loading", textContent: "Carico la ricetta…" }));
+    const close = el("button", { class: "x", title: "Chiudi", onclick: () => this._closeRecipe() }, el("ha-icon", { icon: "mdi:close" }));
+    const dialog = el("div", { class: "dlg", role: "dialog", ariaModal: "true", ariaLabel: it.title },
+      el("div", { class: "dlg-head" }, el("div", { class: "dlg-title", textContent: it.title }), close),
+      body);
+    const overlay = el("div", { class: "overlay", onclick: (e) => { if (e.target === overlay) this._closeRecipe(); } }, dialog);
+    this._onKey = (e) => { if (e.key === "Escape") this._closeRecipe(); };
+    window.addEventListener("keydown", this._onKey);
+    this._overlay = overlay;
+    this.shadowRoot.append(overlay);
+    close.focus();
+
+    let recipe;
+    try {
+      recipe = await this._hass.callWS({ type: `${DOMAIN}/recipe`, url: it.url });
+    } catch (err) {
+      if (this._overlay !== overlay) return;
+      body.replaceChildren(
+        el("div", { class: "msg err", textContent: "Non riesco a leggere la ricetta: " + (err.message || err) }),
+        this._siteLink(it.url));
+      return;
+    }
+    if (this._overlay !== overlay) return; // chiusa nel frattempo
+    body.replaceChildren(...this._recipeContent(recipe, it));
+    body.scrollTop = 0;
+  }
+
+  _closeRecipe() {
+    if (this._overlay) this._overlay.remove();
+    this._overlay = null;
+    if (this._onKey) window.removeEventListener("keydown", this._onKey);
+    this._onKey = null;
+  }
+
+  _siteLink(url) {
+    return el("div", { class: "row" },
+      el("a", { class: "btn flat link", href: url, target: "_blank", rel: "noopener noreferrer" },
+        el("ha-icon", { icon: "mdi:open-in-new" }), " Apri sul sito"));
+  }
+
+  _recipeContent(r, it) {
+    const out = [];
+    const image = r.image || it.image;
+    if (image) out.push(el("img", { class: "hero", src: image, referrerPolicy: "no-referrer", alt: "" }));
+    if (r.description) out.push(el("p", { class: "desc", textContent: r.description }));
+
+    const meta = el("div", { class: "meta" });
+    const chip = (icon, text) => meta.append(el("span", { class: "chip" }, el("ha-icon", { icon }), text));
+    if (r.times.total) chip("mdi:clock-outline", "Totale " + r.times.total);
+    if (r.times.prep) chip("mdi:knife", "Preparazione " + r.times.prep);
+    if (r.times.cook) chip("mdi:stove", "Cottura " + r.times.cook);
+    if (r.yield) chip("mdi:silverware-fork-knife", /^\d+$/.test(r.yield) ? `${r.yield} persone` : r.yield);
+    if (meta.childNodes.length) out.push(meta);
+
+    if (!r.ingredients.length && !r.steps.length) {
+      out.push(el("div", { class: "msg", textContent:
+        "Questo sito non pubblica ingredienti e passaggi in un formato che riesco a leggere." }));
+      out.push(this._siteLink(r.url || it.url));
+      return out;
+    }
+
+    if (r.ingredients.length) {
+      const have = this._ingredients.map((i) => i.toLowerCase());
+      const ul = el("ul", { class: "ingr" });
+      for (const ing of r.ingredients) {
+        const box = el("input", { type: "checkbox" });
+        const li = el("li", {}, el("label", {}, box, el("span", { textContent: ing })));
+        if (have.some((h) => ing.toLowerCase().includes(h))) li.classList.add("have");
+        box.addEventListener("change", () => li.classList.toggle("done", box.checked));
+        ul.append(li);
+      }
+      out.push(el("h3", { textContent: "Ingredienti" }), ul);
+    }
+
+    if (r.steps.length) {
+      const ol = el("ol", { class: "steps" });
+      for (const s of r.steps) {
+        if (s.heading) {
+          ol.append(el("li", { class: "sec", textContent: s.heading }));
+          continue;
+        }
+        const li = el("li", {}, el("p", { textContent: s.text }));
+        if (s.images && s.images.length) {
+          li.append(el("div", { class: "pics" },
+            ...s.images.map((src) => el("img", { src, loading: "lazy", referrerPolicy: "no-referrer", alt: "" }))));
+        }
+        ol.append(li);
+      }
+      out.push(el("h3", { textContent: "Preparazione" }), ol);
+    }
+    out.push(this._siteLink(r.url || it.url));
+    return out;
   }
 
   /* ---------- Impostazioni siti ---------- */
