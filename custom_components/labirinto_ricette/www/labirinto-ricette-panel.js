@@ -18,10 +18,10 @@ const STYLE = `
   h2 { margin: 0 0 12px; font-size: 18px; font-weight: 500; }
   .hint { color: var(--secondary-text-color); font-size: 13px; margin: 6px 0 0; }
   .bar { display: flex; gap: 8px; }
-  input[type=text] { flex: 1; min-width: 0; padding: 12px; font-size: 16px; border-radius: 8px;
+  input[type=text], input[type=search] { flex: 1; min-width: 0; padding: 12px; font-size: 16px; border-radius: 8px;
     border: 1px solid var(--divider-color); background: var(--primary-background-color);
     color: var(--primary-text-color); box-sizing: border-box; }
-  input[type=text]:focus { outline: 2px solid var(--primary-color); outline-offset: -1px; }
+  input[type=text]:focus, input[type=search]:focus { outline: 2px solid var(--primary-color); outline-offset: -1px; }
   button.btn { padding: 10px 16px; border: 0; border-radius: 8px; cursor: pointer; font-size: 15px;
     background: var(--primary-color); color: var(--text-primary-color, #fff); white-space: nowrap; }
   button.btn.flat { background: none; color: var(--primary-color); border: 1px solid var(--divider-color); }
@@ -222,7 +222,7 @@ class LabirintoRicettePanel extends HTMLElement {
         onclick: () => { this._view = view; this._render(); },
       }, el("ha-icon", { icon }), text);
       main.append(el("div", { class: "tabs" },
-        tab("search", "mdi:magnify", "Cerca"),
+        tab("search", "mdi:fridge-outline", "Ingredienti"),
         tab("favorites", "mdi:heart", n ? `I miei preferiti (${n})` : "I miei preferiti")));
       if (this._view === "search") this._renderSearch(main);
       else this._renderFavorites(main);
@@ -274,7 +274,7 @@ class LabirintoRicettePanel extends HTMLElement {
 
     const enabled = this._sites.filter((s) => s.enabled !== false).map((s) => s.name);
     main.append(el("div", { class: "box" },
-      el("h2", { textContent: "Ingredienti" }),
+      el("h2", { textContent: "Cosa hai in frigo?" }),
       el("div", { class: "bar" }, input, addBtn),
       chips,
       el("div", { class: "row" }, this._searchBtn),
@@ -368,8 +368,29 @@ class LabirintoRicettePanel extends HTMLElement {
       return;
     }
     const list = el("div", { class: "list" });
-    for (const f of favs) list.append(this._item(f, f.id));
-    main.append(list);
+    const count = el("div", { class: "status" });
+    const input = el("input", {
+      type: "search",
+      placeholder: "Cerca nei preferiti per nome…",
+      value: this._favFilter || "",
+      enterKeyHint: "search",
+    });
+    // Filtra senza ridisegnare la pagina, così il campo non perde il focus
+    const fill = () => {
+      this._favFilter = input.value;
+      const words = input.value.toLowerCase().split(/\s+/).filter(Boolean);
+      const shown = favs.filter((f) => {
+        const text = `${f.title} ${f.site}`.toLowerCase();
+        return words.every((w) => text.includes(w));
+      });
+      list.replaceChildren(...shown.map((f) => this._item(f, f.id)));
+      count.textContent = words.length
+        ? (shown.length ? `${shown.length} di ${favs.length} preferiti` : "Nessun preferito con questo nome.")
+        : "";
+    };
+    input.addEventListener("input", fill);
+    main.append(el("div", { class: "box" }, el("div", { class: "bar" }, input)), count, list);
+    fill();
   }
 
   _item(it, favId = null) {
