@@ -4,16 +4,18 @@ from __future__ import annotations
 
 from typing import Any
 
+import secrets
+
 import voluptuous as vol
 
 from homeassistant.components import websocket_api
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 
-from .const import CONF_SITES, DEFAULT_SITES, DOMAIN
-from .scraper import async_fetch_recipe, async_search_site, site_domain
+from homeassistant.exceptions import HomeAssistantError
 
-RECIPE_CACHE_SIZE = 50
+from .const import CONF_SHARE_TOKEN, CONF_SITES, DEFAULT_SITES, DOMAIN, SHARE_URL
+from .scraper import async_search_site
+from .search import async_get_recipe, get_entry as _entry
 
 SITE_SCHEMA = vol.Schema(
     {
@@ -22,11 +24,6 @@ SITE_SCHEMA = vol.Schema(
         vol.Optional("enabled", default=True): bool,
     }
 )
-
-
-def _entry(hass: HomeAssistant) -> ConfigEntry | None:
-    entries = hass.config_entries.async_entries(DOMAIN)
-    return entries[0] if entries else None
 
 
 def _site_error(site: dict[str, Any]) -> str | None:
@@ -44,6 +41,11 @@ def async_register(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, ws_save_sites)
     websocket_api.async_register_command(hass, ws_test_site)
     websocket_api.async_register_command(hass, ws_recipe)
+    websocket_api.async_register_command(hass, ws_share_regenerate)
+
+
+def _share_path(token: str | None) -> str | None:
+    return f"{SHARE_URL}/{token}" if token else None
 
 
 @websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/config"})
@@ -56,14 +58,32 @@ def ws_config(
     if entry is None:
         connection.send_error(msg["id"], "not_configured", "Integrazione non configurata")
         return
-    connection.send_result(
-        msg["id"],
-        {
-            "sites": entry.options.get(CONF_SITES, DEFAULT_SITES),
-            "defaults": DEFAULT_SITES,
-            "last": hass.data[DOMAIN].get("last"),
-        },
+    result = {
+        "sites": entry.options.get(CONF_SITES, DEFAULT_SITES),
+        "defaults": DEFAULT_SITES,
+        "last": hass.data[DOMAIN].get("last"),
+    }
+    if connection.user.is_admin:
+        result["share_path"] = _share_path(entry.data.get(CONF_SHARE_TOKEN))
+    connection.send_result(msg["id"], result)
+
+
+@websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/share/regenerate"})
+@websocket_api.require_admin
+@callback
+def ws_share_regenerate(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict
+) -> None:
+    """Nuovo link per il ricettario senza login: il vecchio smette di funzionare."""
+    entry = _entry(hass)
+    if entry is None:
+        connection.send_error(msg["id"], "not_configured", "Integrazione non configurata")
+        return
+    token = secrets.token_urlsafe(16)
+    hass.config_entries.async_update_entry(
+        entry, data={**entry.data, CONF_SHARE_TOKEN: token}
     )
+    connection.send_result(msg["id"], {"share_path": _share_path(token)})
 
 
 @websocket_api.websocket_command(
@@ -139,25 +159,9 @@ async def ws_recipe(
     hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict
 ) -> None:
     """Ingredienti, descrizione e passaggi di una ricetta."""
-    url = msg["url"]
-    entry = _entry(hass)
-    sites = entry.options.get(CONF_SITES, DEFAULT_SITES) if entry else []
-    # Solo pagine dei siti configurati: il pannello non deve scaricare URL qualsiasi
-    if not url.startswith(("http://", "https://")) or site_domain(url) not in {
-        site_domain(s["url"]) for s in sites
-    }:
-        connection.send_error(msg["id"], "invalid_url", "Questo indirizzo non è di un sito configurato")
+    try:
+        recipe = await async_get_recipe(hass, msg["url"])
+    except HomeAssistantError as err:
+        connection.send_error(msg["id"], "fetch_failed", str(err))
         return
-    cache: dict[str, Any] = hass.data[DOMAIN].setdefault("recipes", {})
-    if url not in cache:
-        try:
-            recipe = await async_fetch_recipe(hass, url)
-        except Exception as err:  # noqa: BLE001 - riportato all'utente
-            connection.send_error(
-                msg["id"], "fetch_failed", str(err) or type(err).__name__
-            )
-            return
-        if len(cache) >= RECIPE_CACHE_SIZE:
-            cache.pop(next(iter(cache)))
-        cache[url] = recipe
-    connection.send_result(msg["id"], cache[url])
+    connection.send_result(msg["id"], recipe)

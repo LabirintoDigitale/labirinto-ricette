@@ -156,6 +156,7 @@ class LabirintoRicettePanel extends HTMLElement {
       const cfg = await this._hass.callWS({ type: `${DOMAIN}/config` });
       this._sites = cfg.sites || [];
       this._defaults = cfg.defaults || [];
+      this._sharePath = cfg.share_path || null;
       if (cfg.last && !this._results) {
         this._ingredients = cfg.last.ingredients || [];
         this._results = cfg.last.results || [];
@@ -526,6 +527,50 @@ class LabirintoRicettePanel extends HTMLElement {
           el("button", { class: "btn flat", textContent: "Prova", onclick: (e) => this._test(url.value.trim(), addMsg, e.currentTarget) }),
           el("button", { class: "btn", textContent: "Aggiungi", onclick: add }))),
     );
+    if (this._sharePath) main.append(this._shareBox());
+  }
+
+  _shareBox() {
+    const link = location.origin + this._sharePath;
+    const input = el("input", { type: "text", readOnly: true, value: link });
+    input.addEventListener("focus", () => input.select());
+    const msg = el("div", { class: "msg" });
+    const copy = async () => {
+      try {
+        await navigator.clipboard.writeText(link);
+      } catch (_e) {
+        // senza https il browser non dà accesso agli appunti
+        input.select();
+        document.execCommand("copy");
+      }
+      msg.className = "msg ok";
+      msg.textContent = "Link copiato.";
+    };
+    const regenerate = async (btn) => {
+      if (!confirm("Creare un nuovo link? Quello vecchio smetterà di funzionare.")) return;
+      btn.disabled = true;
+      try {
+        const r = await this._hass.callWS({ type: `${DOMAIN}/share/regenerate` });
+        this._sharePath = r.share_path;
+        this._settingsMsg = { ok: true, text: "Nuovo link creato: il vecchio non funziona più." };
+        this._render();
+      } catch (err) {
+        msg.className = "msg err";
+        msg.textContent = "Errore: " + (err.message || err);
+        btn.disabled = false;
+      }
+    };
+    return el("div", { class: "box" },
+      el("h2", { textContent: "Link diretto al ricettario" }),
+      el("p", { class: "hint", textContent:
+        "Con questo link chiunque lo abbia può cercare ricette senza entrare in Home Assistant (per esempio da un tablet in cucina). Non può cambiare i siti né vedere altro di Home Assistant." }),
+      el("div", { class: "bar" }, input),
+      msg,
+      el("div", { class: "row" },
+        el("button", { class: "btn flat", textContent: "Rigenera", onclick: (e) => regenerate(e.currentTarget) }),
+        el("a", { class: "btn flat link", href: link, target: "_blank", rel: "noopener noreferrer" },
+          el("ha-icon", { icon: "mdi:open-in-new" }), " Apri"),
+        el("button", { class: "btn", textContent: "Copia link", onclick: copy })));
   }
 
   async _test(url, out, btn) {

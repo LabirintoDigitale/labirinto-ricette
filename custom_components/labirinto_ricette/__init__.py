@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-import asyncio
-import logging
+import secrets
 from pathlib import Path
 
 import voluptuous as vol
@@ -18,26 +17,24 @@ from homeassistant.core import (
     ServiceResponse,
     SupportsResponse,
 )
-from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.typing import ConfigType
 from homeassistant.loader import async_get_integration
 
-from . import websocket
+from . import share, websocket
 from .const import (
     CARD_URL,
+    CONF_SHARE_TOKEN,
     CONF_SITES,
-    DEFAULT_SITES,
     DOMAIN,
     OLD_SITE_URLS,
     PANEL_PATH,
     PANEL_URL,
     SIGNAL_UPDATE,
 )
-from .scraper import async_search_site
+from .search import async_search, normalize
 
-_LOGGER = logging.getLogger(__name__)
 PLATFORMS = ["sensor"]
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
@@ -49,12 +46,6 @@ SEARCH_SCHEMA = vol.Schema(
         ),
     }
 )
-
-
-def _normalize(value: str | list[str]) -> list[str]:
-    if isinstance(value, str):
-        value = value.replace(";", ",").split(",")
-    return [v.strip() for v in value if v and v.strip()]
 
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
@@ -70,52 +61,12 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     )
     add_extra_js_url(hass, CARD_URL)
     websocket.async_register(hass)
+    share.async_register(hass)
 
     async def handle_search(call: ServiceCall) -> ServiceResponse:
-        entries = hass.config_entries.async_entries(DOMAIN)
-        if not entries:
-            raise ServiceValidationError("Integrazione non configurata")
-        entry = entries[0]
-        sites = [
-            s
-            for s in entry.options.get(CONF_SITES, DEFAULT_SITES)
-            if s.get("enabled", True)
-        ]
-        ingredients = _normalize(call.data["ingredients"])
-        if not ingredients:
-            raise ServiceValidationError("Inserisci almeno un ingrediente")
-        if not sites:
-            raise ServiceValidationError("Nessun sito di ricette attivo")
-
-        query = " ".join(ingredients)
-        limit = call.data["max_per_site"]
-        outcomes = await asyncio.gather(
-            *(async_search_site(hass, s, query, limit) for s in sites),
-            return_exceptions=True,
+        response = await async_search(
+            hass, normalize(call.data["ingredients"]), call.data["max_per_site"]
         )
-
-        per_site: list[list[dict]] = []
-        errors: dict[str, str] = {}
-        for site, outcome in zip(sites, outcomes):
-            if isinstance(outcome, Exception):
-                _LOGGER.warning("Ricerca su %s fallita: %s", site["name"], outcome)
-                errors[site["name"]] = str(outcome) or type(outcome).__name__
-            else:
-                per_site.append(outcome)
-
-        # Alterna i risultati dei vari siti
-        results: list[dict] = []
-        for i in range(limit):
-            for items in per_site:
-                if i < len(items):
-                    results.append(items[i])
-
-        response = {
-            "query": query,
-            "ingredients": ingredients,
-            "results": results,
-            "errors": errors,
-        }
         hass.data[DOMAIN]["last"] = response
         async_dispatcher_send(hass, SIGNAL_UPDATE)
         return response
@@ -142,6 +93,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                     {**s, "url": OLD_SITE_URLS.get(s["url"], s["url"])} for s in sites
                 ],
             },
+        )
+    if CONF_SHARE_TOKEN not in entry.data:
+        hass.config_entries.async_update_entry(
+            entry, data={**entry.data, CONF_SHARE_TOKEN: secrets.token_urlsafe(16)}
         )
     integration = await async_get_integration(hass, DOMAIN)
     await panel_custom.async_register_panel(

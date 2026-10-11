@@ -2,11 +2,14 @@
 
 DOMAIN = "labirinto_ricette"
 CONF_SITES = "sites"
+CONF_SHARE_TOKEN = "share_token"
 SIGNAL_UPDATE = f"{DOMAIN}_update"
 
 CARD_URL = f"/{DOMAIN}/labirinto-ricette-card.js"
 PANEL_URL = f"/{DOMAIN}/labirinto-ricette-panel.js"
 PANEL_PATH = "labirinto-ricette"
+# Ricettario senza login: {SHARE_URL}/<token>
+SHARE_URL = f"/api/{DOMAIN}/app"
 
 # {query} viene sostituito con gli ingredienti separati da "+"
 DEFAULT_SITES = [

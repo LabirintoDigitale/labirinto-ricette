@@ -20,6 +20,10 @@ Dopo aver aggiunto l'integrazione compare la voce **Ricette** nella barra latera
 3. tocca una ricetta: si apre una finestra con descrizione, tempi, ingredienti (in grassetto quelli che hai) e i passaggi con le foto. Il link **Apri sul sito** porta alla pagina originale (anche Ctrl+clic);
 4. con **⚙ Siti** (solo amministratori) attivi/disattivi i siti, li rimuovi, ne aggiungi di nuovi e li provi con **Prova**.
 
+### Link diretto (senza login)
+In **⚙ Siti** trovi il **link diretto al ricettario**: si apre senza entrare in Home Assistant (es. un tablet in
+cucina). Chi ha il link può solo cercare e leggere ricette. **Rigenera** crea un link nuovo e disattiva il vecchio.
+
 ### Carta Lovelace
 La carta viene caricata automaticamente. Aggiungi una carta manuale:
 ```yaml

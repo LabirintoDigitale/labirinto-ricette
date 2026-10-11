@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex, nofollow">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#03a9f4">
+<title>Ricette</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8D%B3%3C/text%3E%3C/svg%3E">
+<style>
+  :root {
+    color-scheme: light dark;
+    --primary-color: #03a9f4;
+    --text-primary-color: #fff;
+    --app-header-background-color: #03a9f4;
+    --app-header-text-color: #fff;
+    --primary-background-color: #fafafa;
+    --card-background-color: #fff;
+    --secondary-background-color: #e5e5e5;
+    --divider-color: rgba(0, 0, 0, .12);
+    --primary-text-color: #212121;
+    --secondary-text-color: #727272;
+    --error-color: #db4437;
+    --success-color: #43a047;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --app-header-background-color: #101e24;
+      --primary-background-color: #111111;
+      --card-background-color: #1c1c1c;
+      --secondary-background-color: #2a2a2a;
+      --divider-color: rgba(225, 225, 225, .12);
+      --primary-text-color: #e1e1e1;
+      --secondary-text-color: #9b9b9b;
+    }
+  }
+  html, body { margin: 0; background: var(--primary-background-color);
+    font-family: Roboto, "Segoe UI", system-ui, -apple-system, sans-serif; }
+</style>
+<script>
+  // Icone: stesso nome delle icone di Home Assistant (mdi:...), prese da @mdi/svg
+  customElements.define("ha-icon", class extends HTMLElement {
+    static get observedAttributes() { return ["icon"]; }
+    set icon(v) { this._icon = v; this._draw(); }
+    get icon() { return this._icon; }
+    connectedCallback() { this._draw(); }
+    attributeChangedCallback(_n, _o, v) { this.icon = v; }
+    _draw() {
+      if (!this._icon) return;
+      const name = this._icon.replace(/^mdi:/, "");
+      const url = `https://cdn.jsdelivr.net/npm/@mdi/svg@7.4.47/svg/${name}.svg`;
+      Object.assign(this.style, {
+        display: "inline-block", width: "var(--mdc-icon-size, 24px)", height: "var(--mdc-icon-size, 24px)",
+        background: "currentColor", flex: "none", verticalAlign: "middle",
+        webkitMask: `url(${url}) center / contain no-repeat`, mask: `url(${url}) center / contain no-repeat`,
+      });
+    }
+  });
+
+  // Al posto di Home Assistant: la pagina chiama le API del link segreto
+  const BASE = location.pathname.replace(/\/+$/, "");
+  async function api(path, options) {
+    const resp = await fetch(BASE + path, options);
+    let data = null;
+    try { data = await resp.json(); } catch (_e) { /* risposta non JSON */ }
+    if (!resp.ok) throw new Error((data && data.message) || `Errore ${resp.status}`);
+    return data;
+  }
+  window.ricetteHass = {
+    user: { is_admin: false },
+    async callWS(msg) {
+      if (msg.type === "labirinto_ricette/config") return api("/config");
+      if (msg.type === "labirinto_ricette/recipe") return api("/recipe?url=" + encodeURIComponent(msg.url));
+      if (msg.type === "call_service" && msg.service === "search") {
+        const response = await api("/search", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(msg.service_data),
+        });
+        return { response };
+      }
+      throw new Error("Operazione non disponibile");
+    },
+  };
+</script>
+<script type="module" src="{{PANEL_URL}}"></script>
+</head>
+<body>
+<labirinto-ricette-panel id="app"></labirinto-ricette-panel>
+<script type="module">
+  await customElements.whenDefined("labirinto-ricette-panel");
+  const app = document.getElementById("app");
+  app.narrow = true;
+  app.hass = window.ricetteHass;
+</script>
+</body>
+</html>
