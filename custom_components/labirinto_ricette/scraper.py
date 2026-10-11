@@ -99,11 +99,16 @@ def _img_src(img) -> str | None:
     return None
 
 
+def _strip_prefix(title: str) -> str:
+    """Toglie il prefisso "Ricetta" dai titoli (es. Misya)."""
+    return re.sub(r"^ricetta\s*:?\s+", "", title, flags=re.IGNORECASE)
+
+
 def _good_title(text: str | None) -> str | None:
     """Scarta titoli generici ("Immagine") e slug ("gnocchi-di-cavolo-nero")."""
     if not text:
         return None
-    text = " ".join(htmllib.unescape(text).split())
+    text = _strip_prefix(" ".join(htmllib.unescape(text).split()))
     if len(text) < 4 or text.lower() in GENERIC_TITLES:
         return None
     if " " not in text and ("-" in text or "_" in text):
@@ -246,6 +251,7 @@ def _step_images_from_page(soup: BeautifulSoup, steps: list[dict[str, Any]], pag
         (" ".join(p.get_text(" ").split()), p) for p in soup.find_all(["p", "li", "div"])
         if p.find(["p", "div"]) is None
     ]
+    starts = [s["text"][:40] for s in steps if "text" in s]
     for step in steps:
         if "text" not in step:
             continue
@@ -253,16 +259,30 @@ def _step_images_from_page(soup: BeautifulSoup, steps: list[dict[str, Any]], pag
         for text, node in paragraphs:
             if not text.startswith(start):
                 continue
-            container = node.parent
-            for _ in range(3):
-                if container is None:
-                    break
+            # Parte dal paragrafo stesso e sale, ma mai fino a un blocco che
+            # contiene anche altri passaggi (le foto sarebbero di tutti).
+            container = node
+            for _ in range(4):
                 imgs = [i for img in container.find_all("img") if (i := _img_src(img))]
                 if imgs:
                     step["images"] = [urljoin(page_url, i) for i in imgs[:4]]
                     break
                 container = container.parent
+                if container is None:
+                    break
+                block = " ".join(container.get_text(" ").split())
+                if any(other != start and other in block for other in starts):
+                    break
             break
+    # Stesse foto su più passaggi: non sono foto dei passaggi
+    seen: dict[tuple, int] = {}
+    for step in steps:
+        if step.get("images"):
+            key = tuple(step["images"])
+            seen[key] = seen.get(key, 0) + 1
+    for step in steps:
+        if step.get("images") and seen[tuple(step["images"])] > 1:
+            step["images"] = []
 
 
 def parse_recipe(html: str, page_url: str) -> dict[str, Any]:
@@ -297,7 +317,7 @@ def parse_recipe(html: str, page_url: str) -> dict[str, Any]:
     if recipe is None:
         return result
 
-    result["title"] = _clean(recipe.get("name")) or result["title"]
+    result["title"] = _strip_prefix(_clean(recipe.get("name")) or result["title"])
     result["description"] = _clean(recipe.get("description")) or result["description"]
     result["image"] = _image_from(recipe.get("image")) or result["image"]
     yld = recipe.get("recipeYield")
