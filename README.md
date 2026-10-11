@@ -13,6 +13,12 @@ disattivato di default). Puoi attivarli/disattivarli e aggiungerne altri.
 4. **Impostazioni → Dispositivi e servizi → Aggiungi integrazione → Labirinto Ricette**.
 
 ## Uso
+### Pagina "Ricette" nel menu laterale
+Dopo aver aggiunto l'integrazione compare la voce **Ricette** nella barra laterale di Home Assistant:
+1. scrivi gli ingredienti che hai in frigo (separati da virgola o uno alla volta con **Invio**);
+2. premi **Cerca ricette**: sotto compare l'elenco delle ricette trovate, con foto e sito; toccandone una si apre la ricetta;
+3. con **⚙ Siti** (solo amministratori) attivi/disattivi i siti, li rimuovi, ne aggiungi di nuovi e li provi con **Prova**.
+
 ### Carta Lovelace
 La carta viene caricata automaticamente. Aggiungi una carta manuale:
 ```yaml

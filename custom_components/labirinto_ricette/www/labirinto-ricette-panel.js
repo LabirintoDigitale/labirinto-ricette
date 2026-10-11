@@ -1,0 +1,422 @@
+/* Labirinto Ricette - pannello laterale */
+const DOMAIN = "labirinto_ricette";
+
+const STYLE = `
+  :host { display: block; min-height: 100vh; background: var(--primary-background-color);
+    color: var(--primary-text-color); font-family: var(--paper-font-body1_-_font-family, inherit); }
+  .toolbar { display: flex; align-items: center; gap: 4px; height: 56px; padding: 0 12px;
+    background: var(--app-header-background-color, var(--primary-color));
+    color: var(--app-header-text-color, var(--text-primary-color, #fff));
+    border-bottom: var(--app-header-border-bottom, none); position: sticky; top: 0; z-index: 2; }
+  .toolbar .title { flex: 1; font-size: 20px; font-weight: 400; margin-left: 8px; }
+  .toolbar button.icon { background: none; border: 0; color: inherit; cursor: pointer;
+    display: flex; align-items: center; gap: 6px; padding: 8px 10px; border-radius: 20px; font-size: 14px; }
+  .toolbar button.icon:hover { background: rgba(255,255,255,.12); }
+  main { max-width: 900px; margin: 0 auto; padding: 16px; box-sizing: border-box; }
+  .box { background: var(--card-background-color); border-radius: var(--ha-card-border-radius, 12px);
+    box-shadow: var(--ha-card-box-shadow, none); border: 1px solid var(--divider-color); padding: 16px; margin-bottom: 16px; }
+  h2 { margin: 0 0 12px; font-size: 18px; font-weight: 500; }
+  .hint { color: var(--secondary-text-color); font-size: 13px; margin: 6px 0 0; }
+  .bar { display: flex; gap: 8px; }
+  input[type=text] { flex: 1; min-width: 0; padding: 12px; font-size: 16px; border-radius: 8px;
+    border: 1px solid var(--divider-color); background: var(--primary-background-color);
+    color: var(--primary-text-color); box-sizing: border-box; }
+  input[type=text]:focus { outline: 2px solid var(--primary-color); outline-offset: -1px; }
+  button.btn { padding: 10px 16px; border: 0; border-radius: 8px; cursor: pointer; font-size: 15px;
+    background: var(--primary-color); color: var(--text-primary-color, #fff); white-space: nowrap; }
+  button.btn.flat { background: none; color: var(--primary-color); border: 1px solid var(--divider-color); }
+  button.btn.danger { background: none; color: var(--error-color, #db4437); border: 1px solid var(--divider-color); }
+  button.btn:disabled { opacity: .5; cursor: default; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .chip { display: inline-flex; align-items: center; gap: 4px; padding: 4px 6px 4px 12px; border-radius: 16px;
+    background: var(--secondary-background-color); font-size: 14px; }
+  .chip button { background: none; border: 0; cursor: pointer; color: var(--secondary-text-color);
+    font-size: 16px; line-height: 1; padding: 2px 6px; }
+  .status { margin: 4px 0 12px; color: var(--secondary-text-color); font-size: 14px; }
+  .status .err { color: var(--error-color, #db4437); }
+  .list { display: flex; flex-direction: column; gap: 10px; }
+  a.item { display: flex; gap: 12px; text-decoration: none; color: inherit; padding: 8px;
+    background: var(--card-background-color); border: 1px solid var(--divider-color); border-radius: 12px; }
+  a.item:hover { border-color: var(--primary-color); }
+  a.item img, a.item .ph { flex: none; width: 120px; height: 90px; object-fit: cover; border-radius: 8px;
+    background: var(--secondary-background-color); }
+  .info { min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 6px; }
+  .t { font-size: 16px; font-weight: 500; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical; overflow: hidden; }
+  .s { font-size: 13px; color: var(--secondary-text-color); }
+  .site { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--divider-color); }
+  .site:last-child { border-bottom: 0; }
+  .site .info { flex: 1; }
+  .site .u { font-size: 12px; color: var(--secondary-text-color); word-break: break-all; }
+  .site .actions { display: flex; gap: 6px; flex: none; }
+  .site.off .t { color: var(--secondary-text-color); }
+  input[type=checkbox] { width: 20px; height: 20px; accent-color: var(--primary-color); flex: none; }
+  .form { display: flex; flex-direction: column; gap: 8px; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; margin-top: 12px; }
+  .msg { font-size: 14px; margin-top: 8px; }
+  .msg.ok { color: var(--success-color, #43a047); }
+  .msg.err { color: var(--error-color, #db4437); }
+  .empty { text-align: center; padding: 32px 16px; color: var(--secondary-text-color); }
+  .empty ha-icon { --mdc-icon-size: 48px; display: block; margin-bottom: 8px; }
+  @media (max-width: 600px) {
+    main { padding: 12px; }
+    a.item img, a.item .ph { width: 96px; height: 72px; }
+    .site { flex-wrap: wrap; }
+    .site .actions { width: 100%; justify-content: flex-end; }
+  }
+`;
+
+function el(tag, props = {}, ...children) {
+  const node = document.createElement(tag);
+  for (const [k, v] of Object.entries(props)) {
+    if (k === "class") node.className = v;
+    else if (k.startsWith("on")) node.addEventListener(k.slice(2), v);
+    else node[k] = v;
+  }
+  for (const c of children) if (c != null) node.append(c);
+  return node;
+}
+
+class LabirintoRicettePanel extends HTMLElement {
+  constructor() {
+    super();
+    this.attachShadow({ mode: "open" });
+    this._view = "search";
+    this._ingredients = [];
+    this._results = null;
+    this._errors = {};
+    this._sites = [];
+    this._defaults = [];
+    this._loaded = false;
+  }
+
+  set hass(hass) {
+    const first = !this._hass;
+    this._hass = hass;
+    if (this._menu) this._menu.hass = hass;
+    if (first) {
+      this._render();
+      this._load();
+    }
+  }
+
+  set narrow(narrow) {
+    this._narrow = narrow;
+    if (this._menu) this._menu.narrow = narrow;
+  }
+
+  set panel(panel) {}
+
+  get _isAdmin() {
+    return !!(this._hass && this._hass.user && this._hass.user.is_admin);
+  }
+
+  async _load() {
+    try {
+      const cfg = await this._hass.callWS({ type: `${DOMAIN}/config` });
+      this._sites = cfg.sites || [];
+      this._defaults = cfg.defaults || [];
+      if (cfg.last && !this._results) {
+        this._ingredients = cfg.last.ingredients || [];
+        this._results = cfg.last.results || [];
+        this._errors = cfg.last.errors || {};
+      }
+      this._loaded = true;
+    } catch (err) {
+      this._loadError = err.message || String(err);
+    }
+    this._render();
+  }
+
+  _render() {
+    const root = this.shadowRoot;
+    root.replaceChildren();
+    this._menu = document.createElement("ha-menu-button");
+    this._menu.hass = this._hass;
+    this._menu.narrow = this._narrow;
+
+    const toolbar = el("div", { class: "toolbar" }, this._menu,
+      el("div", { class: "title", textContent: this._view === "search" ? "Ricette" : "Siti di ricette" }));
+    if (this._view === "search") {
+      if (this._isAdmin) {
+        toolbar.append(el("button", { class: "icon", title: "Configura i siti", onclick: () => this._openSettings() },
+          el("ha-icon", { icon: "mdi:cog" }), el("span", { textContent: "Siti" })));
+      }
+    } else {
+      toolbar.append(el("button", { class: "icon", title: "Torna alla ricerca", onclick: () => this._closeSettings() },
+        el("ha-icon", { icon: "mdi:close" })));
+    }
+
+    const main = el("main");
+    if (this._loadError) {
+      main.append(el("div", { class: "box" }, el("div", { class: "msg err", textContent: "Errore: " + this._loadError })));
+    } else if (this._view === "search") {
+      this._renderSearch(main);
+    } else {
+      this._renderSettings(main);
+    }
+    root.append(el("style", { textContent: STYLE }), toolbar, main);
+  }
+
+  /* ---------- Ricerca ---------- */
+
+  _renderSearch(main) {
+    const input = el("input", {
+      type: "text",
+      placeholder: "Cosa hai in frigo? es. zucchine, uova, parmigiano",
+      enterKeyHint: "search",
+    });
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        if (input.value.trim()) this._addIngredients(input.value);
+        else this._search();
+      }
+    });
+    const addBtn = el("button", { class: "btn flat", textContent: "Aggiungi", onclick: () => this._addIngredients(input.value) });
+    this._searchBtn = el("button", {
+      class: "btn",
+      textContent: "Cerca ricette",
+      onclick: () => {
+        if (input.value.trim()) this._addIngredients(input.value, false);
+        this._search();
+      },
+    });
+    this._input = input;
+
+    const chips = el("div", { class: "chips" });
+    for (const ing of this._ingredients) {
+      chips.append(el("span", { class: "chip" }, ing,
+        el("button", { title: "Rimuovi", textContent: "×", onclick: () => this._removeIngredient(ing) })));
+    }
+    if (this._ingredients.length) {
+      chips.append(el("button", { class: "btn flat", textContent: "Svuota", onclick: () => {
+        this._ingredients = [];
+        this._render();
+        this._focusInput();
+      } }));
+    }
+
+    const enabled = this._sites.filter((s) => s.enabled !== false).map((s) => s.name);
+    main.append(el("div", { class: "box" },
+      el("h2", { textContent: "Ingredienti" }),
+      el("div", { class: "bar" }, input, addBtn),
+      chips,
+      el("div", { class: "row" }, this._searchBtn),
+      el("p", { class: "hint", textContent: this._loaded
+        ? (enabled.length ? "Cerco su: " + enabled.join(", ") : "Nessun sito attivo: aggiungine uno da ⚙ Siti.")
+        : "" }),
+    ));
+
+    this._status = el("div", { class: "status" });
+    this._list = el("div", { class: "list" });
+    main.append(this._status, this._list);
+    this._renderResults();
+  }
+
+  _focusInput() {
+    if (this._input) this._input.focus();
+  }
+
+  _addIngredients(text, rerender = true) {
+    const parts = text.split(/[,;\n]+/).map((s) => s.trim()).filter(Boolean);
+    for (const p of parts) {
+      if (!this._ingredients.some((i) => i.toLowerCase() === p.toLowerCase())) this._ingredients.push(p);
+    }
+    if (rerender) {
+      this._render();
+      this._focusInput();
+    }
+  }
+
+  _removeIngredient(ing) {
+    this._ingredients = this._ingredients.filter((i) => i !== ing);
+    this._render();
+  }
+
+  async _search() {
+    if (!this._ingredients.length) {
+      this._status.textContent = "Scrivi almeno un ingrediente.";
+      this._focusInput();
+      return;
+    }
+    this._searching = true;
+    this._render();
+    try {
+      const res = await this._hass.callWS({
+        type: "call_service",
+        domain: DOMAIN,
+        service: "search",
+        service_data: { ingredients: this._ingredients, max_per_site: 8 },
+        return_response: true,
+      });
+      const r = res.response || {};
+      this._results = r.results || [];
+      this._errors = r.errors || {};
+      this._searchError = null;
+    } catch (err) {
+      this._searchError = err.message || String(err);
+    }
+    this._searching = false;
+    this._render();
+  }
+
+  _renderResults() {
+    if (this._searchBtn) this._searchBtn.disabled = !!this._searching;
+    if (this._searching) {
+      this._status.textContent = "Cerco ricette…";
+      return;
+    }
+    if (this._searchError) {
+      this._status.append(el("span", { class: "err", textContent: "Errore: " + this._searchError }));
+      return;
+    }
+    if (this._results == null) {
+      this._list.append(el("div", { class: "empty" }, el("ha-icon", { icon: "mdi:fridge-outline" }),
+        "Aggiungi gli ingredienti che hai in casa e premi “Cerca ricette”."));
+      return;
+    }
+    const items = this._results;
+    this._status.textContent = items.length ? `${items.length} ricette trovate` : "Nessuna ricetta trovata.";
+    const failed = Object.keys(this._errors || {});
+    if (failed.length) {
+      this._status.append(" · ", el("span", { class: "err", textContent: "non hanno risposto: " + failed.join(", ") }));
+    }
+    for (const it of items) this._list.append(this._item(it));
+  }
+
+  _item(it) {
+    const a = el("a", { class: "item", href: it.url, target: "_blank", rel: "noopener noreferrer" });
+    if (it.image) {
+      a.append(el("img", { src: it.image, loading: "lazy", referrerPolicy: "no-referrer", alt: "" }));
+    } else {
+      a.append(el("div", { class: "ph" }));
+    }
+    a.append(el("div", { class: "info" },
+      el("div", { class: "t", textContent: it.title }),
+      el("div", { class: "s", textContent: it.site })));
+    return a;
+  }
+
+  /* ---------- Impostazioni siti ---------- */
+
+  _openSettings() {
+    this._draft = this._sites.map((s) => ({ ...s, enabled: s.enabled !== false }));
+    this._settingsMsg = null;
+    this._view = "settings";
+    this._render();
+  }
+
+  _closeSettings() {
+    this._view = "search";
+    this._render();
+  }
+
+  _renderSettings(main) {
+    const list = el("div");
+    if (!this._draft.length) list.append(el("div", { class: "empty", textContent: "Nessun sito. Aggiungine uno qui sotto." }));
+    this._draft.forEach((s, idx) => {
+      const check = el("input", { type: "checkbox", checked: s.enabled, title: "Attivo" });
+      check.addEventListener("change", () => {
+        s.enabled = check.checked;
+        row.classList.toggle("off", !s.enabled);
+      });
+      const testMsg = el("div", { class: "msg" });
+      const row = el("div", { class: "site" + (s.enabled ? "" : " off") },
+        check,
+        el("div", { class: "info" },
+          el("div", { class: "t", textContent: s.name }),
+          el("div", { class: "u", textContent: s.url }),
+          testMsg),
+        el("div", { class: "actions" },
+          el("button", { class: "btn flat", textContent: "Prova", onclick: (e) => this._test(s.url, testMsg, e.currentTarget) }),
+          el("button", { class: "btn danger", title: "Rimuovi", onclick: () => {
+            this._draft.splice(idx, 1);
+            this._render();
+          } }, el("ha-icon", { icon: "mdi:delete-outline" }))));
+      list.append(row);
+    });
+
+    const name = el("input", { type: "text", placeholder: "Nome, es. Fatto in casa da Benedetta" });
+    const url = el("input", { type: "text", placeholder: "https://www.sito.it/cerca/?q={query}", inputMode: "url" });
+    const addMsg = el("div", { class: "msg" });
+    const add = () => {
+      const n = name.value.trim();
+      const u = url.value.trim();
+      addMsg.className = "msg err";
+      if (!n) return (addMsg.textContent = "Scrivi il nome del sito.");
+      if (!/^https?:\/\//.test(u)) return (addMsg.textContent = "L'URL deve iniziare con https://");
+      if (!u.includes("{query}")) return (addMsg.textContent = "Metti {query} nell'URL al posto degli ingredienti.");
+      if (this._draft.some((s) => s.name.toLowerCase() === n.toLowerCase())) return (addMsg.textContent = "Esiste già un sito con questo nome.");
+      this._draft.push({ name: n, url: u, enabled: true });
+      this._settingsMsg = { ok: true, text: `“${n}” aggiunto: premi Salva per confermare.` };
+      this._render();
+    };
+
+    const saveBtn = el("button", { class: "btn", textContent: "Salva", onclick: () => this._save(saveBtn) });
+    const msg = this._settingsMsg ? el("div", { class: "msg " + (this._settingsMsg.ok ? "ok" : "err"), textContent: this._settingsMsg.text }) : null;
+
+    main.append(
+      el("div", { class: "box" },
+        el("h2", { textContent: "I tuoi siti" }),
+        el("p", { class: "hint", textContent: "Spunta i siti su cui cercare. “Prova” fa una ricerca di prova con “pasta”." }),
+        list,
+        msg,
+        el("div", { class: "row" },
+          el("button", { class: "btn flat", textContent: "Ripristina predefiniti", onclick: () => {
+            const extra = this._draft.filter((s) => !this._defaults.some((d) => d.name === s.name));
+            this._draft = [...this._defaults.map((d) => ({ ...d })), ...extra];
+            this._settingsMsg = { ok: true, text: "Siti predefiniti ripristinati: premi Salva per confermare." };
+            this._render();
+          } }),
+          el("button", { class: "btn flat", textContent: "Annulla", onclick: () => this._closeSettings() }),
+          saveBtn)),
+      el("div", { class: "box" },
+        el("h2", { textContent: "Aggiungi un sito" }),
+        el("div", { class: "form" }, name, url),
+        el("p", { class: "hint", textContent:
+          "Come trovare l'URL: cerca “pasta” sul sito, copia l'indirizzo della pagina dei risultati e sostituisci “pasta” con {query}." }),
+        addMsg,
+        el("div", { class: "row" },
+          el("button", { class: "btn flat", textContent: "Prova", onclick: (e) => this._test(url.value.trim(), addMsg, e.currentTarget) }),
+          el("button", { class: "btn", textContent: "Aggiungi", onclick: add }))),
+    );
+  }
+
+  async _test(url, out, btn) {
+    btn.disabled = true;
+    out.className = "msg";
+    out.textContent = "Provo…";
+    try {
+      const r = await this._hass.callWS({ type: `${DOMAIN}/sites/test`, url });
+      if (!r.ok) {
+        out.className = "msg err";
+        out.textContent = "Non funziona: " + r.error;
+      } else if (!r.count) {
+        out.className = "msg err";
+        out.textContent = "Il sito risponde ma non trovo ricette nella pagina (forse le carica con JavaScript).";
+      } else {
+        out.className = "msg ok";
+        out.textContent = `Funziona: ${r.count} ricette trovate, es. “${r.results[0].title}”.`;
+      }
+    } catch (err) {
+      out.className = "msg err";
+      out.textContent = "Errore: " + (err.message || err);
+    }
+    btn.disabled = false;
+  }
+
+  async _save(btn) {
+    btn.disabled = true;
+    try {
+      const r = await this._hass.callWS({ type: `${DOMAIN}/sites/save`, sites: this._draft });
+      this._sites = r.sites;
+      this._view = "search";
+    } catch (err) {
+      this._settingsMsg = { ok: false, text: "Non salvato: " + (err.message || err) };
+    }
+    this._render();
+  }
+}
+
+customElements.define("labirinto-ricette-panel", LabirintoRicettePanel);

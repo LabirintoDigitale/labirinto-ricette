@@ -5,6 +5,8 @@ CONF_SITES = "sites"
 SIGNAL_UPDATE = f"{DOMAIN}_update"
 
 CARD_URL = f"/{DOMAIN}/labirinto-ricette-card.js"
+PANEL_URL = f"/{DOMAIN}/labirinto-ricette-panel.js"
+PANEL_PATH = "labirinto-ricette"
 
 # {query} viene sostituito con gli ingredienti separati da "+"
 DEFAULT_SITES = [

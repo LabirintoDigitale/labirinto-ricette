@@ -8,6 +8,7 @@ from pathlib import Path
 
 import voluptuous as vol
 
+from homeassistant.components import frontend, panel_custom
 from homeassistant.components.frontend import add_extra_js_url
 from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntry
@@ -21,8 +22,18 @@ from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.typing import ConfigType
+from homeassistant.loader import async_get_integration
 
-from .const import CARD_URL, CONF_SITES, DEFAULT_SITES, DOMAIN, SIGNAL_UPDATE
+from . import websocket
+from .const import (
+    CARD_URL,
+    CONF_SITES,
+    DEFAULT_SITES,
+    DOMAIN,
+    PANEL_PATH,
+    PANEL_URL,
+    SIGNAL_UPDATE,
+)
 from .scraper import async_search_site
 
 _LOGGER = logging.getLogger(__name__)
@@ -46,14 +57,18 @@ def _normalize(value: str | list[str]) -> list[str]:
 
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
-    """Registra servizio e carta Lovelace."""
+    """Registra servizio, comandi websocket, carta Lovelace e file del pannello."""
     hass.data.setdefault(DOMAIN, {})
 
-    card = Path(__file__).parent / "www" / "labirinto-ricette-card.js"
+    www = Path(__file__).parent / "www"
     await hass.http.async_register_static_paths(
-        [StaticPathConfig(CARD_URL, str(card), False)]
+        [
+            StaticPathConfig(CARD_URL, str(www / "labirinto-ricette-card.js"), False),
+            StaticPathConfig(PANEL_URL, str(www / "labirinto-ricette-panel.js"), False),
+        ]
     )
     add_extra_js_url(hass, CARD_URL)
+    websocket.async_register(hass)
 
     async def handle_search(call: ServiceCall) -> ServiceResponse:
         entries = hass.config_entries.async_entries(DOMAIN)
@@ -94,7 +109,12 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
                 if i < len(items):
                     results.append(items[i])
 
-        response = {"query": query, "results": results, "errors": errors}
+        response = {
+            "query": query,
+            "ingredients": ingredients,
+            "results": results,
+            "errors": errors,
+        }
         hass.data[DOMAIN]["last"] = response
         async_dispatcher_send(hass, SIGNAL_UPDATE)
         return response
@@ -110,14 +130,21 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    # I siti vengono letti dalle opzioni a ogni ricerca: cambiarli non richiede reload.
+    integration = await async_get_integration(hass, DOMAIN)
+    await panel_custom.async_register_panel(
+        hass,
+        frontend_url_path=PANEL_PATH,
+        webcomponent_name="labirinto-ricette-panel",
+        sidebar_title="Ricette",
+        sidebar_icon="mdi:chef-hat",
+        module_url=f"{PANEL_URL}?v={integration.version}",
+        require_admin=False,
+    )
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-    entry.async_on_unload(entry.add_update_listener(_reload))
     return True
 
 
-async def _reload(hass: HomeAssistant, entry: ConfigEntry) -> None:
-    await hass.config_entries.async_reload(entry.entry_id)
-
-
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    frontend.async_remove_panel(hass, PANEL_PATH)
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
