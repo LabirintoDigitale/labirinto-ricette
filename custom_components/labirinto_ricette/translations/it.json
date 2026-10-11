@@ -1,0 +1,47 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Labirinto Ricette",
+        "description": "Vuoi aggiungere l'integrazione Labirinto Ricette? Potrai gestire i siti di ricette dalle opzioni."
+      }
+    },
+    "abort": {
+      "already_configured": "Integrazione già configurata"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Siti di ricette",
+        "description": "Attiva, rimuovi o aggiungi siti. Nell'URL usa {query} dove vanno gli ingredienti, ad esempio https://www.sito.it/cerca/?q={query}",
+        "data": {
+          "enabled": "Siti attivi",
+          "remove": "Siti da rimuovere",
+          "new_name": "Nome nuovo sito",
+          "new_url": "URL di ricerca del nuovo sito"
+        }
+      }
+    },
+    "error": {
+      "invalid_site": "Servono un nome e un URL http(s) che contenga {query}",
+      "duplicate": "Esiste già un sito con questo nome"
+    }
+  },
+  "services": {
+    "search": {
+      "name": "Cerca ricette",
+      "description": "Cerca ricette sui siti attivi a partire dagli ingredienti.",
+      "fields": {
+        "ingredients": {
+          "name": "Ingredienti",
+          "description": "Elenco separato da virgole."
+        },
+        "max_per_site": {
+          "name": "Risultati per sito",
+          "description": "Numero massimo di ricette per ogni sito."
+        }
+      }
+    }
+  }
+}

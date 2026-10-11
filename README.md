@@ -1,0 +1,48 @@
+# Labirinto Ricette
+
+Integrazione per Home Assistant (installabile con HACS): scrivi gli ingredienti che hai in casa e cerca ricette
+su più siti di cucina, con anteprima, foto e link alla ricetta.
+
+Siti già impostati: **Giallo Zafferano, HelloFresh, Cookist, La Cucina Italiana, Cucchiaio d'Argento** (l'ultimo è
+disattivato di default). Puoi attivarli/disattivarli e aggiungerne altri.
+
+## Installazione con HACS
+1. HACS → menu ⋮ → **Repository personalizzati**.
+2. Incolla `https://github.com/LabirintoDigitale/labirinto-ricette`, categoria **Integrazione**.
+3. Scarica **Labirinto Ricette** e riavvia Home Assistant.
+4. **Impostazioni → Dispositivi e servizi → Aggiungi integrazione → Labirinto Ricette**.
+
+## Uso
+### Carta Lovelace
+La carta viene caricata automaticamente. Aggiungi una carta manuale:
+```yaml
+type: custom:labirinto-ricette-card
+title: Cosa cucino?
+max_per_site: 6
+```
+Scrivi gli ingredienti separati da virgola e premi **Cerca**.
+
+### Servizio
+```yaml
+action: labirinto_ricette.search
+data:
+  ingredients: "pasta, zucchine, uova"
+  max_per_site: 5
+response_variable: ricette
+```
+L'ultimo risultato è disponibile anche nell'attributo `results` di `sensor.labirinto_ricette_risultati`.
+
+## Gestire i siti
+**Impostazioni → Dispositivi e servizi → Labirinto Ricette → Configura**: attiva/rimuovi siti o aggiungine uno
+indicando nome e URL di ricerca, con `{query}` al posto degli ingredienti:
+```
+https://www.miosito.it/cerca/?q={query}
+```
+Per trovare l'URL: fai una ricerca sul sito, copia l'indirizzo e sostituisci il testo cercato con `{query}`.
+
+## Come funziona e limiti
+L'integrazione scarica la pagina dei risultati di ricerca e ne estrae titolo, link e immagine (prima dai dati
+strutturati JSON-LD, poi dai link con immagine). Non usa API ufficiali: se un sito cambia struttura, usa
+protezioni anti-bot o genera i risultati via JavaScript (può succedere con HelloFresh), potrebbe restituire pochi
+risultati o nessuno. Apri una issue indicando il sito. Rispetta i termini d'uso dei siti: i risultati
+rimandano sempre alla pagina originale.

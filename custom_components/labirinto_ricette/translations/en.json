@@ -1,0 +1,47 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Labirinto Ricette",
+        "description": "Add the Labirinto Ricette integration? You can manage recipe sites from the options."
+      }
+    },
+    "abort": {
+      "already_configured": "Integration already configured"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Recipe sites",
+        "description": "Enable, remove or add sites. In the URL use {query} where the ingredients go, e.g. https://www.site.com/search/?q={query}",
+        "data": {
+          "enabled": "Enabled sites",
+          "remove": "Sites to remove",
+          "new_name": "New site name",
+          "new_url": "New site search URL"
+        }
+      }
+    },
+    "error": {
+      "invalid_site": "A name and an http(s) URL containing {query} are required",
+      "duplicate": "A site with this name already exists"
+    }
+  },
+  "services": {
+    "search": {
+      "name": "Search recipes",
+      "description": "Search the enabled recipe sites by ingredients.",
+      "fields": {
+        "ingredients": {
+          "name": "Ingredients",
+          "description": "Comma separated list."
+        },
+        "max_per_site": {
+          "name": "Results per site",
+          "description": "Maximum recipes per site."
+        }
+      }
+    }
+  }
+}
