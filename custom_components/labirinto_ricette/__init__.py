@@ -23,6 +23,7 @@ from homeassistant.helpers.typing import ConfigType
 from homeassistant.loader import async_get_integration
 
 from . import share, websocket
+from .favorites import Favorites, ImageView
 from .const import (
     CARD_URL,
     CONF_SHARE_TOKEN,
@@ -60,6 +61,10 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         ]
     )
     add_extra_js_url(hass, CARD_URL)
+    favorites = Favorites(hass)
+    await favorites.async_load()
+    hass.data[DOMAIN]["favorites"] = favorites
+    hass.http.register_view(ImageView(favorites))
     websocket.async_register(hass)
     share.async_register(hass)
 

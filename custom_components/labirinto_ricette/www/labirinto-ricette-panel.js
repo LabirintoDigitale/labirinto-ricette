@@ -58,6 +58,16 @@ const STYLE = `
   .msg.err { color: var(--error-color, #db4437); }
   .empty { text-align: center; padding: 32px 16px; color: var(--secondary-text-color); }
   .empty ha-icon { --mdc-icon-size: 48px; display: block; margin-bottom: 8px; }
+  .tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+  .tab { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 20px; cursor: pointer;
+    border: 1px solid var(--divider-color); background: var(--card-background-color); color: var(--primary-text-color);
+    font-size: 14px; }
+  .tab ha-icon { --mdc-icon-size: 18px; color: var(--secondary-text-color); }
+  .tab.on { background: var(--primary-color); border-color: var(--primary-color); color: var(--text-primary-color, #fff); }
+  .tab.on ha-icon { color: inherit; }
+  .heart.on { color: #e53935; }
+  .heart.busy { animation: pulse 1s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity: .35; } }
   .overlay { position: fixed; inset: 0; z-index: 10; background: rgba(0,0,0,.5);
     display: flex; align-items: center; justify-content: center; padding: 24px; box-sizing: border-box; }
   .dlg { background: var(--card-background-color); color: var(--primary-text-color); border-radius: 16px;
@@ -166,7 +176,21 @@ class LabirintoRicettePanel extends HTMLElement {
     } catch (err) {
       this._loadError = err.message || String(err);
     }
+    await this._loadFavorites();
     this._render();
+  }
+
+  async _loadFavorites() {
+    try {
+      const r = await this._hass.callWS({ type: `${DOMAIN}/favorites/list` });
+      this._favs = r.favorites || [];
+    } catch (_e) {
+      this._favs = this._favs || [];
+    }
+  }
+
+  _favFor(url) {
+    return (this._favs || []).find((f) => f.url === url);
   }
 
   _render() {
@@ -177,8 +201,8 @@ class LabirintoRicettePanel extends HTMLElement {
     this._menu.narrow = this._narrow;
 
     const toolbar = el("div", { class: "toolbar" }, this._menu,
-      el("div", { class: "title", textContent: this._view === "search" ? "Ricette" : "Siti di ricette" }));
-    if (this._view === "search") {
+      el("div", { class: "title", textContent: this._view === "settings" ? "Siti di ricette" : "Ricette" }));
+    if (this._view !== "settings") {
       if (this._isAdmin) {
         toolbar.append(el("button", { class: "icon", title: "Configura i siti", onclick: () => this._openSettings() },
           el("ha-icon", { icon: "mdi:cog" }), el("span", { textContent: "Siti" })));
@@ -191,8 +215,17 @@ class LabirintoRicettePanel extends HTMLElement {
     const main = el("main");
     if (this._loadError) {
       main.append(el("div", { class: "box" }, el("div", { class: "msg err", textContent: "Errore: " + this._loadError })));
-    } else if (this._view === "search") {
-      this._renderSearch(main);
+    } else if (this._view === "search" || this._view === "favorites") {
+      const n = (this._favs || []).length;
+      const tab = (view, icon, text) => el("button", {
+        class: "tab" + (this._view === view ? " on" : ""),
+        onclick: () => { this._view = view; this._render(); },
+      }, el("ha-icon", { icon }), text);
+      main.append(el("div", { class: "tabs" },
+        tab("search", "mdi:magnify", "Cerca"),
+        tab("favorites", "mdi:heart", n ? `I miei preferiti (${n})` : "I miei preferiti")));
+      if (this._view === "search") this._renderSearch(main);
+      else this._renderFavorites(main);
     } else {
       this._renderSettings(main);
     }
@@ -327,13 +360,25 @@ class LabirintoRicettePanel extends HTMLElement {
     for (const it of items) this._list.append(this._item(it));
   }
 
-  _item(it) {
+  _renderFavorites(main) {
+    const favs = this._favs || [];
+    if (!favs.length) {
+      main.append(el("div", { class: "empty" }, el("ha-icon", { icon: "mdi:heart-outline" }),
+        "Nessun preferito. Apri una ricetta e tocca il ♥ in alto per salvarla qui: testo e foto restano salvati anche se il sito la toglie."));
+      return;
+    }
+    const list = el("div", { class: "list" });
+    for (const f of favs) list.append(this._item(f, f.id));
+    main.append(list);
+  }
+
+  _item(it, favId = null) {
     const a = el("a", { class: "item", href: it.url, target: "_blank", rel: "noopener noreferrer" });
     a.addEventListener("click", (e) => {
       // Ctrl/Cmd/clic centrale aprono comunque il sito
       if (e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0) return;
       e.preventDefault();
-      this._openRecipe(it);
+      this._openRecipe(it, favId);
     });
     if (it.image) {
       a.append(el("img", { src: it.image, loading: "lazy", referrerPolicy: "no-referrer", alt: "" }));
@@ -348,12 +393,12 @@ class LabirintoRicettePanel extends HTMLElement {
 
   /* ---------- Finestra della ricetta ---------- */
 
-  async _openRecipe(it) {
+  async _openRecipe(it, favId = null) {
     this._closeRecipe();
     const body = el("div", { class: "dlg-body" }, el("div", { class: "loading", textContent: "Carico la ricetta…" }));
     const close = el("button", { class: "x", title: "Chiudi", onclick: () => this._closeRecipe() }, el("ha-icon", { icon: "mdi:close" }));
     const dialog = el("div", { class: "dlg", role: "dialog", ariaModal: "true", ariaLabel: it.title },
-      el("div", { class: "dlg-head" }, el("div", { class: "dlg-title", textContent: it.title }), close),
+      el("div", { class: "dlg-head" }, el("div", { class: "dlg-title", textContent: it.title }), this._heart(it), close),
       body);
     const overlay = el("div", { class: "overlay", onclick: (e) => { if (e.target === overlay) this._closeRecipe(); } }, dialog);
     this._onKey = (e) => { if (e.key === "Escape") this._closeRecipe(); };
@@ -364,7 +409,14 @@ class LabirintoRicettePanel extends HTMLElement {
 
     let recipe;
     try {
-      recipe = await this._hass.callWS({ type: `${DOMAIN}/recipe`, url: it.url });
+      // Dai preferiti: la copia salvata (funziona anche se il sito non c'è più)
+      const fav = favId || (this._favFor(it.url) || {}).id;
+      if (fav) {
+        const saved = await this._hass.callWS({ type: `${DOMAIN}/favorites/get`, id: fav });
+        recipe = { ...saved.recipe, savedAt: saved.saved_at };
+      } else {
+        recipe = await this._hass.callWS({ type: `${DOMAIN}/recipe`, url: it.url });
+      }
     } catch (err) {
       if (this._overlay !== overlay) return;
       body.replaceChildren(
@@ -375,6 +427,41 @@ class LabirintoRicettePanel extends HTMLElement {
     if (this._overlay !== overlay) return; // chiusa nel frattempo
     body.replaceChildren(...this._recipeContent(recipe, it));
     body.scrollTop = 0;
+  }
+
+  _heart(it) {
+    const btn = el("button", { class: "x heart" });
+    const paint = () => {
+      const saved = !!this._favFor(it.url);
+      btn.replaceChildren(el("ha-icon", { icon: saved ? "mdi:heart" : "mdi:heart-outline" }));
+      btn.classList.toggle("on", saved);
+      btn.title = saved ? "Togli dai preferiti" : "Salva nei preferiti";
+    };
+    paint();
+    btn.addEventListener("click", async () => {
+      const fav = this._favFor(it.url);
+      if (fav && !confirm("Togliere la ricetta dai preferiti? La copia salvata (testo e foto) verrà cancellata.")) return;
+      btn.disabled = true;
+      btn.classList.add("busy");
+      btn.title = fav ? "Tolgo…" : "Salvo testo e foto…";
+      try {
+        if (fav) {
+          await this._hass.callWS({ type: `${DOMAIN}/favorites/remove`, id: fav.id });
+        } else {
+          await this._hass.callWS({
+            type: `${DOMAIN}/favorites/add`, url: it.url, site: it.site || "", title: it.title || "", image: it.image || "",
+          });
+        }
+        await this._loadFavorites();
+      } catch (err) {
+        alert("Non riesco a salvare: " + (err.message || err));
+      }
+      btn.disabled = false;
+      btn.classList.remove("busy");
+      paint();
+      this._render(); // aggiorna contatore ed elenco preferiti sotto la finestra
+    });
+    return btn;
   }
 
   _closeRecipe() {
@@ -439,6 +526,10 @@ class LabirintoRicettePanel extends HTMLElement {
         ol.append(li);
       }
       out.push(el("h3", { textContent: "Preparazione" }), ol);
+    }
+    if (r.savedAt) {
+      out.push(el("p", { class: "hint", textContent:
+        "Salvata nei preferiti il " + new Date(r.savedAt).toLocaleDateString("it-IT") + ": testo e foto sono conservati in Home Assistant." }));
     }
     out.push(this._siteLink(r.url || it.url));
     return out;

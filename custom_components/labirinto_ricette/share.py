@@ -74,6 +74,13 @@ class ShareApiView(HomeAssistantView):
                 for s in get_sites(hass)
             ]
             return self.json({"sites": sites, "defaults": [], "last": None})
+        if action == "favorites":
+            return self.json({"favorites": hass.data[DOMAIN]["favorites"].summaries()})
+        if action == "favorite":
+            try:
+                return self.json(hass.data[DOMAIN]["favorites"].get(request.query.get("id", "")))
+            except HomeAssistantError as err:
+                return self.json_message(str(err), HTTPStatus.NOT_FOUND)
         if action == "recipe":
             try:
                 return self.json(await async_get_recipe(hass, request.query.get("url", "")))
@@ -85,6 +92,8 @@ class ShareApiView(HomeAssistantView):
         hass: HomeAssistant = request.app["hass"]
         if not _valid(hass, token):
             return _not_found()
+        if action in ("favorite_add", "favorite_remove"):
+            return await self._favorite(hass, request, action)
         if action != "search":
             return _not_found()
         try:
@@ -97,3 +106,24 @@ class ShareApiView(HomeAssistantView):
             return self.json(await async_search(hass, ingredients, limit))
         except HomeAssistantError as err:
             return self.json_message(str(err), HTTPStatus.BAD_REQUEST)
+
+    async def _favorite(
+        self, hass: HomeAssistant, request: web.Request, action: str
+    ) -> web.Response:
+        favorites = hass.data[DOMAIN]["favorites"]
+        try:
+            body = await request.json()
+            if action == "favorite_remove":
+                await favorites.async_remove(str(body["id"]))
+                return self.json({})
+            fav = await favorites.async_add(
+                str(body["url"]),
+                str(body.get("site", "")),
+                str(body.get("title", "")),
+                str(body.get("image", "")),
+            )
+        except (ValueError, TypeError, KeyError):
+            return self.json_message("Richiesta non valida", HTTPStatus.BAD_REQUEST)
+        except HomeAssistantError as err:
+            return self.json_message(str(err), HTTPStatus.BAD_REQUEST)
+        return self.json({"id": fav["id"]})

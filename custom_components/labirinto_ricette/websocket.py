@@ -42,6 +42,10 @@ def async_register(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, ws_test_site)
     websocket_api.async_register_command(hass, ws_recipe)
     websocket_api.async_register_command(hass, ws_share_regenerate)
+    websocket_api.async_register_command(hass, ws_favorites_list)
+    websocket_api.async_register_command(hass, ws_favorites_get)
+    websocket_api.async_register_command(hass, ws_favorites_add)
+    websocket_api.async_register_command(hass, ws_favorites_remove)
 
 
 def _share_path(token: str | None) -> str | None:
@@ -165,3 +169,67 @@ async def ws_recipe(
         connection.send_error(msg["id"], "fetch_failed", str(err))
         return
     connection.send_result(msg["id"], recipe)
+
+
+# ---------------------------------------------------------------------------
+# Preferiti
+
+
+def _favorites(hass: HomeAssistant):
+    return hass.data[DOMAIN]["favorites"]
+
+
+@websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/favorites/list"})
+@callback
+def ws_favorites_list(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict
+) -> None:
+    connection.send_result(msg["id"], {"favorites": _favorites(hass).summaries()})
+
+
+@websocket_api.websocket_command(
+    {vol.Required("type"): f"{DOMAIN}/favorites/get", vol.Required("id"): str}
+)
+@callback
+def ws_favorites_get(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict
+) -> None:
+    try:
+        connection.send_result(msg["id"], _favorites(hass).get(msg["id"]))
+    except HomeAssistantError as err:
+        connection.send_error(msg["id"], "not_found", str(err))
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): f"{DOMAIN}/favorites/add",
+        vol.Required("url"): vol.All(str, vol.Strip),
+        vol.Optional("site", default=""): str,
+        vol.Optional("title", default=""): str,
+        vol.Optional("image", default=""): str,
+    }
+)
+@websocket_api.async_response
+async def ws_favorites_add(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict
+) -> None:
+    """Salva testo e immagini della ricetta."""
+    try:
+        fav = await _favorites(hass).async_add(
+            msg["url"], msg["site"], msg["title"], msg["image"]
+        )
+    except HomeAssistantError as err:
+        connection.send_error(msg["id"], "save_failed", str(err))
+        return
+    connection.send_result(msg["id"], {"id": fav["id"]})
+
+
+@websocket_api.websocket_command(
+    {vol.Required("type"): f"{DOMAIN}/favorites/remove", vol.Required("id"): str}
+)
+@websocket_api.async_response
+async def ws_favorites_remove(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict
+) -> None:
+    await _favorites(hass).async_remove(msg["id"])
+    connection.send_result(msg["id"], {})
