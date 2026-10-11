@@ -14,7 +14,7 @@
     "step": {
       "init": {
         "title": "Siti di ricette",
-        "description": "Attiva, rimuovi o aggiungi siti. Nell'URL usa {query} dove vanno gli ingredienti, ad esempio https://www.sito.it/cerca/?q={query}",
+        "description": "Attiva, rimuovi o aggiungi siti. Nell'URL usa {query} dove vanno gli ingredienti, ad esempio {example}",
         "data": {
           "enabled": "Siti attivi",
           "remove": "Siti da rimuovere",

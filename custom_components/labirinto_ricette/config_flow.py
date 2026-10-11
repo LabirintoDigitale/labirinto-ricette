@@ -68,4 +68,12 @@ class LabirintoRicetteOptionsFlow(config_entries.OptionsFlow):
                 vol.Optional("new_url", default=""): str,
             }
         )
-        return self.async_show_form(step_id="init", data_schema=schema, errors=errors)
+        return self.async_show_form(
+            step_id="init",
+            data_schema=schema,
+            errors=errors,
+            description_placeholders={
+                "query": "{query}",
+                "example": "https://www.sito.it/cerca/?q={query}",
+            },
+        )

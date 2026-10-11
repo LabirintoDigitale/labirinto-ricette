@@ -14,7 +14,7 @@
     "step": {
       "init": {
         "title": "Recipe sites",
-        "description": "Enable, remove or add sites. In the URL use {query} where the ingredients go, e.g. https://www.site.com/search/?q={query}",
+        "description": "Enable, remove or add sites. In the URL use {query} where the ingredients go, e.g. {example}",
         "data": {
           "enabled": "Enabled sites",
           "remove": "Sites to remove",
