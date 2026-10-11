@@ -412,7 +412,7 @@ class LabirintoRicettePanel extends HTMLElement {
       // Dai preferiti: la copia salvata (funziona anche se il sito non c'è più)
       const fav = favId || (this._favFor(it.url) || {}).id;
       if (fav) {
-        const saved = await this._hass.callWS({ type: `${DOMAIN}/favorites/get`, id: fav });
+        const saved = await this._hass.callWS({ type: `${DOMAIN}/favorites/get`, fav_id: fav });
         recipe = { ...saved.recipe, savedAt: saved.saved_at };
       } else {
         recipe = await this._hass.callWS({ type: `${DOMAIN}/recipe`, url: it.url });
@@ -446,7 +446,7 @@ class LabirintoRicettePanel extends HTMLElement {
       btn.title = fav ? "Tolgo…" : "Salvo testo e foto…";
       try {
         if (fav) {
-          await this._hass.callWS({ type: `${DOMAIN}/favorites/remove`, id: fav.id });
+          await this._hass.callWS({ type: `${DOMAIN}/favorites/remove`, fav_id: fav.id });
         } else {
           await this._hass.callWS({
             type: `${DOMAIN}/favorites/add`, url: it.url, site: it.site || "", title: it.title || "", image: it.image || "",

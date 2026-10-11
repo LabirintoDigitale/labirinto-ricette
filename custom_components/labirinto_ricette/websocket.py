@@ -188,14 +188,14 @@ def ws_favorites_list(
 
 
 @websocket_api.websocket_command(
-    {vol.Required("type"): f"{DOMAIN}/favorites/get", vol.Required("id"): str}
+    {vol.Required("type"): f"{DOMAIN}/favorites/get", vol.Required("fav_id"): str}
 )
 @callback
 def ws_favorites_get(
     hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict
 ) -> None:
     try:
-        connection.send_result(msg["id"], _favorites(hass).get(msg["id"]))
+        connection.send_result(msg["id"], _favorites(hass).get(msg["fav_id"]))
     except HomeAssistantError as err:
         connection.send_error(msg["id"], "not_found", str(err))
 
@@ -225,11 +225,11 @@ async def ws_favorites_add(
 
 
 @websocket_api.websocket_command(
-    {vol.Required("type"): f"{DOMAIN}/favorites/remove", vol.Required("id"): str}
+    {vol.Required("type"): f"{DOMAIN}/favorites/remove", vol.Required("fav_id"): str}
 )
 @websocket_api.async_response
 async def ws_favorites_remove(
     hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict
 ) -> None:
-    await _favorites(hass).async_remove(msg["id"])
+    await _favorites(hass).async_remove(msg["fav_id"])
     connection.send_result(msg["id"], {})
