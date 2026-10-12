@@ -15,6 +15,7 @@ from homeassistant.loader import async_get_integration
 
 from .const import CONF_SHARE_TOKEN, DOMAIN, PANEL_URL, SHARE_URL
 from .search import async_get_recipe, async_search, get_entry, get_sites, normalize
+from .todo import async_add_items, todo_lists
 
 APP_HTML = Path(__file__).parent / "www" / "app.html"
 MAX_INGREDIENTS = 20
@@ -74,6 +75,8 @@ class ShareApiView(HomeAssistantView):
                 for s in get_sites(hass)
             ]
             return self.json({"sites": sites, "defaults": [], "last": None})
+        if action == "todo_lists":
+            return self.json({"lists": todo_lists(hass)})
         if action == "favorites":
             return self.json({"favorites": hass.data[DOMAIN]["favorites"].summaries()})
         if action == "favorite":
@@ -92,6 +95,20 @@ class ShareApiView(HomeAssistantView):
         hass: HomeAssistant = request.app["hass"]
         if not _valid(hass, token):
             return _not_found()
+        if action == "todo_add":
+            try:
+                body = await request.json()
+                added = await async_add_items(
+                    hass,
+                    str(body["entity_id"]),
+                    list(body["items"]),
+                    str(body.get("note", "")),
+                )
+            except (ValueError, TypeError, KeyError):
+                return self.json_message("Richiesta non valida", HTTPStatus.BAD_REQUEST)
+            except HomeAssistantError as err:
+                return self.json_message(str(err), HTTPStatus.BAD_REQUEST)
+            return self.json({"added": added})
         if action in ("favorite_add", "favorite_remove"):
             return await self._favorite(hass, request, action)
         if action != "search":

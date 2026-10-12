@@ -16,6 +16,7 @@ from homeassistant.exceptions import HomeAssistantError
 from .const import CONF_SHARE_TOKEN, CONF_SITES, DEFAULT_SITES, DOMAIN, SHARE_URL
 from .scraper import async_search_site
 from .search import async_get_recipe, get_entry as _entry
+from .todo import async_add_items, todo_lists
 
 SITE_SCHEMA = vol.Schema(
     {
@@ -46,6 +47,8 @@ def async_register(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, ws_favorites_get)
     websocket_api.async_register_command(hass, ws_favorites_add)
     websocket_api.async_register_command(hass, ws_favorites_remove)
+    websocket_api.async_register_command(hass, ws_todo_lists)
+    websocket_api.async_register_command(hass, ws_todo_add)
 
 
 def _share_path(token: str | None) -> str | None:
@@ -233,3 +236,37 @@ async def ws_favorites_remove(
 ) -> None:
     await _favorites(hass).async_remove(msg["fav_id"])
     connection.send_result(msg["id"], {})
+
+
+# ---------------------------------------------------------------------------
+# Liste delle attività
+
+
+@websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/todo/lists"})
+@callback
+def ws_todo_lists(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict
+) -> None:
+    connection.send_result(msg["id"], {"lists": todo_lists(hass)})
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): f"{DOMAIN}/todo/add",
+        vol.Required("entity_id"): str,
+        vol.Required("items"): [str],
+        vol.Optional("note", default=""): str,
+    }
+)
+@websocket_api.async_response
+async def ws_todo_add(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict
+) -> None:
+    try:
+        added = await async_add_items(
+            hass, msg["entity_id"], msg["items"], msg["note"], connection.context(msg)
+        )
+    except HomeAssistantError as err:
+        connection.send_error(msg["id"], "add_failed", str(err))
+        return
+    connection.send_result(msg["id"], {"added": added})

@@ -66,6 +66,9 @@ const STYLE = `
   .tab.on { background: var(--primary-color); border-color: var(--primary-color); color: var(--text-primary-color, #fff); }
   .tab.on ha-icon { color: inherit; }
   .heart.on { color: #e53935; }
+  .picker { margin-top: 8px; padding: 12px; border-radius: 12px; background: var(--secondary-background-color); }
+  .row.left { justify-content: flex-start; margin-top: 8px; }
+  button.btn ha-icon { --mdc-icon-size: 18px; vertical-align: -3px; }
   .heart.busy { animation: pulse 1s ease-in-out infinite; }
   @keyframes pulse { 50% { opacity: .35; } }
   .overlay { position: fixed; inset: 0; z-index: 10; background: rgba(0,0,0,.5);
@@ -485,6 +488,50 @@ class LabirintoRicettePanel extends HTMLElement {
     return btn;
   }
 
+  async _todoPicker(box, items, recipeTitle) {
+    box.replaceChildren(el("div", { class: "msg", textContent: "Carico le liste…" }));
+    let lists;
+    try {
+      lists = (await this._hass.callWS({ type: `${DOMAIN}/todo/lists` })).lists;
+    } catch (err) {
+      box.replaceChildren(el("div", { class: "msg err", textContent: "Errore: " + (err.message || err) }));
+      return;
+    }
+    if (!lists.length) {
+      box.replaceChildren(el("div", { class: "msg err", textContent:
+        "Non ci sono liste delle attività in Home Assistant a cui aggiungere elementi." }));
+      return;
+    }
+    let last = null;
+    try { last = localStorage.getItem("labirinto-ricette-todo"); } catch (_e) { /* niente storage */ }
+    const msg = el("div", { class: "msg" });
+    const buttons = lists.map((l) => el("button", {
+      class: "btn" + (l.entity_id === last ? "" : " flat"),
+      onclick: async () => {
+        buttons.forEach((b) => (b.disabled = true));
+        msg.className = "msg";
+        msg.textContent = "Aggiungo…";
+        try {
+          const r = await this._hass.callWS({
+            type: `${DOMAIN}/todo/add`, entity_id: l.entity_id, items, note: recipeTitle ? `Per: ${recipeTitle}` : "",
+          });
+          try { localStorage.setItem("labirinto-ricette-todo", l.entity_id); } catch (_e) { /* niente storage */ }
+          box.replaceChildren(el("div", { class: "msg ok", textContent:
+            `${r.added === 1 ? "Aggiunto 1 ingrediente" : `Aggiunti ${r.added} ingredienti`} a “${l.name}”.` }));
+        } catch (err) {
+          msg.className = "msg err";
+          msg.textContent = "Non aggiunto: " + (err.message || err);
+          buttons.forEach((b) => (b.disabled = false));
+        }
+      },
+    }, l.name));
+    box.replaceChildren(el("div", { class: "picker" },
+      el("div", { class: "hint", textContent: `In quale lista metto ${items.length === 1 ? "1 ingrediente" : `${items.length} ingredienti`}?` }),
+      el("div", { class: "row left" }, ...buttons,
+        el("button", { class: "btn flat", textContent: "Annulla", onclick: () => box.replaceChildren() })),
+      msg));
+  }
+
   _closeRecipe() {
     if (this._overlay) this._overlay.remove();
     this._overlay = null;
@@ -522,14 +569,38 @@ class LabirintoRicettePanel extends HTMLElement {
     if (r.ingredients.length) {
       const have = this._ingredients.map((i) => i.toLowerCase());
       const ul = el("ul", { class: "ingr" });
+      const boxes = [];
+      const picker = el("div");
+      const addBtn = el("button", { class: "btn" });
+      const refresh = () => {
+        const missing = boxes.filter((b) => !b.box.checked).length;
+        addBtn.disabled = !missing;
+        addBtn.replaceChildren(el("ha-icon", { icon: "mdi:playlist-plus" }),
+          missing ? ` Aggiungi ${missing} alla lista` : " Hai già tutto");
+        picker.replaceChildren();
+      };
       for (const ing of r.ingredients) {
         const box = el("input", { type: "checkbox" });
         const li = el("li", {}, el("label", {}, box, el("span", { textContent: ing })));
         if (have.some((h) => ing.toLowerCase().includes(h))) li.classList.add("have");
-        box.addEventListener("change", () => li.classList.toggle("done", box.checked));
+        box.addEventListener("change", () => {
+          li.classList.toggle("done", box.checked);
+          refresh();
+        });
+        boxes.push({ box, ing });
         ul.append(li);
       }
-      out.push(el("h3", { textContent: "Ingredienti" }), ul);
+      addBtn.addEventListener("click", () => {
+        // Solo gli ingredienti NON spuntati (quelli spuntati li hai già)
+        const items = boxes.filter((b) => !b.box.checked).map((b) => b.ing);
+        this._todoPicker(picker, items, r.title || it.title);
+      });
+      refresh();
+      out.push(el("h3", { textContent: "Ingredienti" }),
+        el("p", { class: "hint", textContent: "Spunta quelli che hai già: gli altri puoi aggiungerli a una lista della spesa." }),
+        ul,
+        el("div", { class: "row" }, addBtn),
+        picker);
     }
 
     if (r.steps.length) {

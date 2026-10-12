@@ -20,6 +20,11 @@ Dopo aver aggiunto l'integrazione compare la voce **Ricette** nella barra latera
 3. tocca una ricetta: si apre una finestra con descrizione, tempi, ingredienti (in grassetto quelli che hai) e i passaggi con le foto. Il link **Apri sul sito** porta alla pagina originale (anche Ctrl+clic);
 4. con **⚙ Siti** (solo amministratori) attivi/disattivi i siti, li rimuovi, ne aggiungi di nuovi e li provi con **Prova**.
 
+### Lista della spesa
+Nella finestra della ricetta spunta gli ingredienti che hai già e premi **Aggiungi alla lista**: scegli una delle
+tue liste delle attività (Casa, Shopping list…) e gli ingredienti **non spuntati** vengono aggiunti, con il nome della
+ricetta come nota se la lista lo supporta. L'ultima lista usata resta evidenziata.
+
 ### Preferiti
 Nella finestra della ricetta tocca il **♥** in alto per salvarla in **I miei preferiti**. Vengono salvati il testo
 completo e tutte le foto (in `config/labirinto_ricette/images`), così la ricetta resta disponibile anche se il sito
