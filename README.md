@@ -3,8 +3,9 @@
 Integrazione per Home Assistant (installabile con HACS): scrivi gli ingredienti che hai in casa e cerca ricette
 su più siti di cucina, con anteprima, foto e link alla ricetta.
 
-Siti già impostati: **Giallo Zafferano, Cookist, La Cucina Italiana**, più **HelloFresh** e **Cucchiaio d'Argento**
-disattivati di default (HelloFresh carica i risultati con JavaScript, Cucchiaio d'Argento blocca le richieste automatiche). Puoi attivarli/disattivarli e aggiungerne altri.
+Siti già impostati: **Giallo Zafferano, Cookist, La Cucina Italiana, HelloFresh**, più **Cucchiaio d'Argento**
+disattivato di default (blocca le richieste automatiche). HelloFresh viene letto dalla sua API, con le foto di ogni
+passaggio. Puoi attivarli/disattivarli e aggiungerne altri.
 
 ## Installazione con HACS
 1. HACS → menu ⋮ → **Repository personalizzati**.

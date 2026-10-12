@@ -21,8 +21,8 @@ DEFAULT_SITES = [
     {
         "name": "HelloFresh",
         "url": "https://www.hellofresh.it/recipes/search/?q={query}",
-        # carica i risultati via JavaScript: la pagina scaricata non li contiene
-        "enabled": False,
+        # risultati letti dall'API di HelloFresh (vedi scraper.py)
+        "enabled": True,
     },
     {
         "name": "Cookist",

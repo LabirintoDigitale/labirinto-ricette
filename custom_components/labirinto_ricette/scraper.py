@@ -6,6 +6,7 @@ import asyncio
 import html as htmllib
 import json
 import re
+import time
 from typing import Any
 from urllib.parse import quote_plus, urldefrag, urljoin, urlparse
 
@@ -358,10 +359,12 @@ async def async_search_site(
     hass: HomeAssistant, site: dict[str, Any], query: str, limit: int
 ) -> list[dict[str, str]]:
     """Cerca su un singolo sito."""
-    html, final_url = await _async_get(
-        hass, site["url"].replace("{query}", quote_plus(query))
-    )
-    items = await hass.async_add_executor_job(parse_results, html, final_url, limit)
+    url = site["url"].replace("{query}", quote_plus(query))
+    if _is_hellofresh(url):
+        items = await _async_search_hellofresh(hass, url, query, limit)
+    else:
+        html, final_url = await _async_get(hass, url)
+        items = await hass.async_add_executor_job(parse_results, html, final_url, limit)
     for item in items:
         item["site"] = site["name"]
     return items
@@ -369,5 +372,132 @@ async def async_search_site(
 
 async def async_fetch_recipe(hass: HomeAssistant, url: str) -> dict[str, Any]:
     """Scarica e analizza la pagina di una ricetta."""
+    if url in HF_ITEMS:
+        return hellofresh_recipe(HF_ITEMS[url])
     html, final_url = await _async_get(hass, url)
     return await hass.async_add_executor_job(parse_recipe, html, final_url)
+
+
+# ---------------------------------------------------------------------------
+# HelloFresh: i risultati arrivano via JavaScript da un'API che usa il token da
+# ospite incluso nella pagina (lo stesso che usa il browser di ogni visitatore).
+
+HF_IMG = "https://img.hellofresh.com/f_auto,fl_lossy,q_auto,w_800/hellofresh_s3"
+HF_TOKEN_TTL = 50 * 60
+HF_ITEMS_MAX = 300
+HF_TOKENS: dict[str, tuple[str, float]] = {}
+HF_ITEMS: dict[str, dict[str, Any]] = {}
+
+
+def _is_hellofresh(url: str) -> bool:
+    return site_domain(url).startswith("hellofresh.")
+
+
+def _hf_image(path: str | None, link: str | None = None) -> str:
+    if path:
+        return HF_IMG + (path if path.startswith("/") else "/" + path)
+    return link or ""
+
+
+async def _async_hf_token(hass: HomeAssistant, page_url: str, refresh: bool = False) -> str:
+    host = urlparse(page_url).netloc
+    cached = HF_TOKENS.get(host)
+    if cached and not refresh and cached[1] > time.monotonic():
+        return cached[0]
+    html, _ = await _async_get(hass, page_url)
+    match = re.search(r'"access_token":"([^"]+)"', html)
+    if not match:
+        raise ValueError("HelloFresh: token non trovato nella pagina")
+    HF_TOKENS[host] = (match.group(1), time.monotonic() + HF_TOKEN_TTL)
+    return match.group(1)
+
+
+async def _async_search_hellofresh(
+    hass: HomeAssistant, page_url: str, query: str, limit: int
+) -> list[dict[str, str]]:
+    host = urlparse(page_url).netloc
+    tld = host.rsplit(".", 1)[-1].lower()
+    params = {
+        "country": tld.upper(),
+        "locale": f"{tld}-{tld.upper()}",
+        "q": query,
+        "take": str(limit),
+    }
+    session = async_get_clientsession(hass)
+    for attempt in range(2):
+        token = await _async_hf_token(hass, page_url, refresh=attempt > 0)
+        async with asyncio.timeout(20):
+            async with session.get(
+                f"https://{host}/gw/recipes/recipes/search",
+                params=params,
+                headers={**HEADERS, "Accept": "application/json", "Authorization": f"Bearer {token}"},
+            ) as resp:
+                if resp.status == 401 and attempt == 0:
+                    continue  # token scaduto: ne prende uno nuovo
+                resp.raise_for_status()
+                data = await resp.json(content_type=None)
+        break
+    results: list[dict[str, str]] = []
+    for item in data.get("items", []):
+        link = item.get("websiteUrl")
+        if not link or not item.get("name") or item.get("isAddon"):
+            continue  # gli "addon" sono prodotti extra, non ricette
+        if len(HF_ITEMS) >= HF_ITEMS_MAX:
+            HF_ITEMS.pop(next(iter(HF_ITEMS)))
+        HF_ITEMS[link] = item
+        results.append(
+            {
+                "title": _clean(item["name"]),
+                "url": link,
+                "image": _hf_image(item.get("imagePath"), item.get("imageLink")),
+            }
+        )
+    return results[:limit]
+
+
+def hellofresh_recipe(item: dict[str, Any]) -> dict[str, Any]:
+    """Ricetta completa dai dati dell'API (con le foto di ogni passaggio)."""
+    names = {i.get("id"): _clean(i.get("name")) for i in item.get("ingredients", [])}
+    yields = item.get("yields") or []
+    portion = next((y for y in yields if y.get("yields") == 2), yields[0] if yields else {})
+    ingredients: list[str] = []
+    for ing in portion.get("ingredients", []):
+        name = names.get(ing.get("id"))
+        if not name:
+            continue
+        amount = ing.get("amount")
+        unit = ing.get("unit") or ""
+        qty = f"{amount:g} {unit}".strip() if isinstance(amount, (int, float)) else ""
+        ingredients.append(f"{name} {qty}".strip())
+    if not ingredients:
+        ingredients = [n for n in names.values() if n]
+    steps = []
+    for step in sorted(item.get("steps", []), key=lambda s: int(s.get("index") or 0)):
+        text = _clean(step.get("instructions"))
+        if text:
+            steps.append(
+                {
+                    "text": text,
+                    "images": [
+                        img
+                        for i in step.get("images", [])
+                        if (img := _hf_image(i.get("path"), i.get("link")))
+                    ],
+                }
+            )
+    title = _clean(item.get("name"))
+    if headline := _clean(item.get("headline")):
+        title = f"{title} {headline}"
+    return {
+        "url": item.get("websiteUrl", ""),
+        "title": title,
+        "description": _clean(item.get("description")),
+        "image": _hf_image(item.get("imagePath"), item.get("imageLink")),
+        "yield": f"{portion['yields']} persone" if portion.get("yields") else "",
+        # prepTime di HelloFresh è il tempo totale mostrato sul sito
+        "times": {"total": d}
+        if (d := _duration(item.get("prepTime")) or _duration(item.get("totalTime")))
+        else {},
+        "ingredients": ingredients,
+        "steps": steps,
+    }
