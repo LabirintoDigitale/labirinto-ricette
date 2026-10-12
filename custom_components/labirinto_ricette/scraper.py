@@ -347,7 +347,7 @@ def parse_recipe(html: str, page_url: str) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
-async def _async_get(hass: HomeAssistant, url: str) -> tuple[str, str]:
+async def async_get_page(hass: HomeAssistant, url: str) -> tuple[str, str]:
     session = async_get_clientsession(hass)
     async with asyncio.timeout(20):
         async with session.get(url, headers=HEADERS) as resp:
@@ -363,7 +363,7 @@ async def async_search_site(
     if _is_hellofresh(url):
         items = await _async_search_hellofresh(hass, url, query, limit)
     else:
-        html, final_url = await _async_get(hass, url)
+        html, final_url = await async_get_page(hass, url)
         items = await hass.async_add_executor_job(parse_results, html, final_url, limit)
     for item in items:
         item["site"] = site["name"]
@@ -374,7 +374,7 @@ async def async_fetch_recipe(hass: HomeAssistant, url: str) -> dict[str, Any]:
     """Scarica e analizza la pagina di una ricetta."""
     if url in HF_ITEMS:
         return hellofresh_recipe(HF_ITEMS[url])
-    html, final_url = await _async_get(hass, url)
+    html, final_url = await async_get_page(hass, url)
     return await hass.async_add_executor_job(parse_recipe, html, final_url)
 
 
@@ -404,7 +404,7 @@ async def _async_hf_token(hass: HomeAssistant, page_url: str, refresh: bool = Fa
     cached = HF_TOKENS.get(host)
     if cached and not refresh and cached[1] > time.monotonic():
         return cached[0]
-    html, _ = await _async_get(hass, page_url)
+    html, _ = await async_get_page(hass, page_url)
     match = re.search(r'"access_token":"([^"]+)"', html)
     if not match:
         raise ValueError("HelloFresh: token non trovato nella pagina")

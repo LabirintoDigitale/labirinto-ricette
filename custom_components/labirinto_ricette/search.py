@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
@@ -11,10 +12,24 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 
 from .const import CONF_SITES, DEFAULT_SITES, DOMAIN
-from .scraper import async_fetch_recipe, async_search_site, site_domain
+from .scraper import (
+    HF_ITEMS,
+    async_fetch_recipe,
+    async_get_page,
+    async_search_site,
+    site_domain,
+)
 
 _LOGGER = logging.getLogger(__name__)
 RECIPE_CACHE_SIZE = 50
+
+# Controllo dei risultati: scarta le pagine che non sono ricette (newsletter,
+# pubblicità, articoli) cercando i dati strutturati della ricetta nella pagina.
+EXTRA_CANDIDATES = 4
+CHECK_CONCURRENCY = 10
+CHECK_TIMEOUT = 12
+CHECK_CACHE_SIZE = 1000
+RECIPE_MARK = re.compile(r'"@type"\s*:\s*(?:\[[^\]]*)?"Recipe"|"recipeIngredient"')
 
 
 def get_entry(hass: HomeAssistant) -> ConfigEntry | None:
@@ -46,9 +61,14 @@ async def async_search(
         raise ServiceValidationError("Nessun sito di ricette attivo")
 
     query = " ".join(ingredients)
+    sem = asyncio.Semaphore(CHECK_CONCURRENCY)
+
+    async def site_search(site: dict[str, Any]) -> list[dict]:
+        items = await async_search_site(hass, site, query, limit + EXTRA_CANDIDATES)
+        return await _async_only_recipes(hass, items, limit, sem)
+
     outcomes = await asyncio.gather(
-        *(async_search_site(hass, s, query, limit) for s in sites),
-        return_exceptions=True,
+        *(site_search(s) for s in sites), return_exceptions=True
     )
 
     per_site: list[list[dict]] = []
@@ -91,3 +111,37 @@ async def async_get_recipe(hass: HomeAssistant, url: str) -> dict[str, Any]:
             cache.pop(next(iter(cache)))
         cache[url] = recipe
     return cache[url]
+
+
+async def _async_is_recipe(
+    hass: HomeAssistant, url: str, sem: asyncio.Semaphore
+) -> bool | None:
+    """True/False se la pagina è/non è una ricetta, None se non si è potuta leggere."""
+    if url in HF_ITEMS or url in hass.data[DOMAIN].get("recipes", {}):
+        return True
+    cache: dict[str, bool] = hass.data[DOMAIN].setdefault("checked", {})
+    if url in cache:
+        return cache[url]
+    async with sem:
+        try:
+            async with asyncio.timeout(CHECK_TIMEOUT):
+                html, _ = await async_get_page(hass, url)
+        except Exception:  # noqa: BLE001 - pagina non verificabile, si tiene
+            return None
+    is_recipe = bool(RECIPE_MARK.search(html))
+    if len(cache) >= CHECK_CACHE_SIZE:
+        cache.pop(next(iter(cache)))
+    cache[url] = is_recipe
+    return is_recipe
+
+
+async def _async_only_recipes(
+    hass: HomeAssistant, items: list[dict], limit: int, sem: asyncio.Semaphore
+) -> list[dict]:
+    if not items:
+        return items
+    checks = await asyncio.gather(*(_async_is_recipe(hass, i["url"], sem) for i in items))
+    if True not in checks:
+        # Il sito non pubblica i dati strutturati: non si possono distinguere
+        return items[:limit]
+    return [item for item, ok in zip(items, checks) if ok is not False][:limit]
