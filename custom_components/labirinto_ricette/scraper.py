@@ -69,6 +69,9 @@ def _clean(text: Any) -> str:
     text = htmllib.unescape(text)
     if "<" in text:
         text = BeautifulSoup(text, "html.parser").get_text(" ")
+        # spazi lasciati dai tag tolti: "( SALMONE ," -> "(SALMONE,"
+        text = re.sub(r"\(\s+", "(", text)
+        text = re.sub(r"\s+([,.;:)])", r"\1", text)
     return " ".join(text.split())
 
 
@@ -362,6 +365,8 @@ async def async_search_site(
     url = site["url"].replace("{query}", quote_plus(query))
     if _is_hellofresh(url):
         items = await _async_search_hellofresh(hass, url, query, limit)
+    elif _is_nutribees(url):
+        items = await _async_search_nutribees(hass, url, query, limit)
     else:
         html, final_url = await async_get_page(hass, url)
         items = await hass.async_add_executor_job(parse_results, html, final_url, limit)
@@ -374,6 +379,8 @@ async def async_fetch_recipe(hass: HomeAssistant, url: str) -> dict[str, Any]:
     """Scarica e analizza la pagina di una ricetta."""
     if url in HF_ITEMS:
         return hellofresh_recipe(HF_ITEMS[url])
+    if _is_nutribees(url):
+        return await _async_nutribees_recipe(hass, url)
     html, final_url = await async_get_page(hass, url)
     return await hass.async_add_executor_job(parse_recipe, html, final_url)
 
@@ -387,6 +394,11 @@ HF_TOKEN_TTL = 50 * 60
 HF_ITEMS_MAX = 300
 HF_TOKENS: dict[str, tuple[str, float]] = {}
 HF_ITEMS: dict[str, dict[str, Any]] = {}
+
+
+def is_api_item(url: str) -> bool:
+    """Risultato preso da un'API (è sicuramente una ricetta/piatto)."""
+    return url in HF_ITEMS or url in NB_ITEMS
 
 
 def _is_hellofresh(url: str) -> bool:
@@ -500,4 +512,138 @@ def hellofresh_recipe(item: dict[str, Any]) -> dict[str, Any]:
         else {},
         "ingredients": ingredients,
         "steps": steps,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Nutribees: piatti pronti. Il menu arriva da /ajax/dishes/matching e la ricerca
+# avviene nel browser su nome, parole chiave e ingredienti: qui si fa lo stesso.
+
+NB_MENUS = ("healthy", "comfort", "star")
+NB_MENU_TTL = 30 * 60
+NB_MENU: dict[str, tuple[float, list[dict[str, Any]]]] = {}
+NB_ITEMS: dict[str, dict[str, Any]] = {}
+
+
+def _is_nutribees(url: str) -> bool:
+    return site_domain(url) == "nutribees.com"
+
+
+def _fold(text: str) -> str:
+    """Minuscolo e senza accenti, come la ricerca di Nutribees."""
+    import unicodedata
+
+    text = unicodedata.normalize("NFD", text.lower())
+    return "".join(c for c in text if not unicodedata.combining(c))
+
+
+async def _async_nutribees_menu(hass: HomeAssistant, host: str) -> list[dict[str, Any]]:
+    cached = NB_MENU.get(host)
+    if cached and cached[0] > time.monotonic():
+        return cached[1]
+    session = async_get_clientsession(hass)
+    dishes: dict[int, dict[str, Any]] = {}
+    for menu in NB_MENUS:
+        async with asyncio.timeout(20):
+            async with session.get(
+                f"https://{host}/ajax/dishes/matching",
+                params={"menuType": menu},
+                headers={**HEADERS, "Accept": "application/json", "X-Requested-With": "XMLHttpRequest"},
+            ) as resp:
+                resp.raise_for_status()
+                data = await resp.json(content_type=None)
+        for entry in data.get("dishes", []) + data.get("otherDishes", []):
+            dish = entry.get("dish", entry)
+            if isinstance(dish, dict) and dish.get("id") is not None:
+                dishes.setdefault(dish["id"], dish)
+    menu_list = list(dishes.values())
+    NB_MENU[host] = (time.monotonic() + NB_MENU_TTL, menu_list)
+    return menu_list
+
+
+def _nb_url(host: str, dish: dict[str, Any]) -> str:
+    # Nutribees non ha una pagina per piatto: il link apre lo shop
+    return f"https://{host}/shop-piatti#piatto-{dish['id']}"
+
+
+def _nb_image(dish: dict[str, Any]) -> str:
+    for image in dish.get("images") or []:
+        urls = image.get("url") or {}
+        if url := urls.get("large") or urls.get("medium") or urls.get("small"):
+            return url
+    return ""
+
+
+async def _async_search_nutribees(
+    hass: HomeAssistant, page_url: str, query: str, limit: int
+) -> list[dict[str, str]]:
+    host = urlparse(page_url).netloc
+    words = [w for w in re.split(r"[\s,'\"-]+", _fold(query)) if len(w) > 2]
+    scored = []
+    for dish in await _async_nutribees_menu(hass, host):
+        details = dish.get("details") or {}
+        text = _fold(
+            " ".join(
+                [details.get("name") or "", dish.get("keywords") or "", _clean(details.get("ingredients"))]
+            )
+        )
+        hits = sum(1 for w in words if w in text)
+        if hits:
+            scored.append((hits, dish))
+    # prima i piatti che contengono tutte le parole
+    scored.sort(key=lambda s: -s[0])
+    results = []
+    for _hits, dish in scored[:limit]:
+        url = _nb_url(host, dish)
+        NB_ITEMS[url] = dish
+        results.append(
+            {"title": _clean(dish["details"].get("name")), "url": url, "image": _nb_image(dish)}
+        )
+    return results
+
+
+def _split_top_level(text: str) -> list[str]:
+    """Divide per virgole che non stanno tra parentesi."""
+    parts, depth, current = [], 0, ""
+    for char in text:
+        depth += char == "("
+        depth -= char == ")" and depth > 0
+        if char == "," and depth == 0:
+            parts.append(current)
+            current = ""
+        else:
+            current += char
+    parts.append(current)
+    return [p.strip(" .") for p in parts if p.strip(" .")]
+
+
+async def _async_nutribees_recipe(hass: HomeAssistant, url: str) -> dict[str, Any]:
+    dish = NB_ITEMS.get(url)
+    if dish is None:
+        match = re.search(r"#piatto-(\d+)$", url)
+        host = urlparse(url).netloc
+        if match:
+            menu = await _async_nutribees_menu(hass, host)
+            dish = next((d for d in menu if str(d.get("id")) == match.group(1)), None)
+        if dish is None:
+            raise ValueError("Piatto non più nel menu di Nutribees")
+        NB_ITEMS[url] = dish
+    details = dish.get("details") or {}
+    raw = details.get("ingredients") or ""
+    label, _, notes = raw.partition("<br>")
+    description = _clean(details.get("description"))
+    lines = re.split(r"<br\s*/?>", f"{notes}<br>{details.get('contains') or ''}")
+    extra = "\n".join(line for part in lines if (line := _clean(part)))
+    if extra:
+        description = f"{description}\n\n{extra}".strip()
+    kcal = (dish.get("nutritionFacts") or {}).get("calories")
+    return {
+        "url": url,
+        "title": _clean(details.get("name")),
+        "description": description,
+        "image": _nb_image(dish),
+        "yield": f"1 porzione · {kcal} kcal" if kcal else "1 porzione",
+        "times": {},
+        "ingredients": _split_top_level(_clean(label)),
+        "steps": [],
     }

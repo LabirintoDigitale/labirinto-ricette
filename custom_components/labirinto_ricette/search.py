@@ -13,7 +13,7 @@ from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 
 from .const import CONF_SITES, DEFAULT_SITES, DOMAIN
 from .scraper import (
-    HF_ITEMS,
+    is_api_item,
     async_fetch_recipe,
     async_get_page,
     async_search_site,
@@ -117,7 +117,7 @@ async def _async_is_recipe(
     hass: HomeAssistant, url: str, sem: asyncio.Semaphore
 ) -> bool | None:
     """True/False se la pagina è/non è una ricetta, None se non si è potuta leggere."""
-    if url in HF_ITEMS or url in hass.data[DOMAIN].get("recipes", {}):
+    if is_api_item(url) or url in hass.data[DOMAIN].get("recipes", {}):
         return True
     cache: dict[str, bool] = hass.data[DOMAIN].setdefault("checked", {})
     if url in cache:

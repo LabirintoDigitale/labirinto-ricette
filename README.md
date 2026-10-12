@@ -5,7 +5,9 @@ su più siti di cucina, con anteprima, foto e link alla ricetta.
 
 Siti già impostati: **Giallo Zafferano, Cookist, La Cucina Italiana, HelloFresh**, più **Cucchiaio d'Argento**
 disattivato di default (blocca le richieste automatiche). HelloFresh viene letto dalla sua API, con le foto di ogni
-passaggio. Puoi attivarli/disattivarli e aggiungerne altri.
+passaggio.
+**Nutribees** (piatti pronti) viene cercato nel menu attuale: la scheda mostra descrizione, ingredienti dell'etichetta,
+allergeni e calorie, ma non i passaggi (sono piatti già pronti). Puoi attivarli/disattivarli e aggiungerne altri.
 
 ## Installazione con HACS
 1. HACS → menu ⋮ → **Repository personalizzati**.

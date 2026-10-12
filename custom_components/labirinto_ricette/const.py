@@ -41,6 +41,21 @@ DEFAULT_SITES = [
     },
 ]
 
+# Siti predefiniti aggiunti nelle versioni successive: vengono proposti una volta
+# anche alle installazioni esistenti (CONF_SITES_VERSION tiene il conto)
+CONF_SITES_VERSION = "sites_version"
+SITES_VERSION = 2
+NEW_SITES = {
+    2: [
+        {
+            "name": "Nutribees",
+            "url": "https://www.nutribees.com/shop-piatti?q={query}",
+            "enabled": True,
+        }
+    ],
+}
+DEFAULT_SITES = DEFAULT_SITES + NEW_SITES[2]
+
 # URL predefiniti cambiati nel tempo: vengono aggiornati nelle installazioni esistenti
 OLD_SITE_URLS = {
     "https://www.lacucinaitaliana.it/ricerca/?q={query}": "https://www.lacucinaitaliana.it/search/?q={query}",

@@ -85,7 +85,7 @@ const STYLE = `
   .dlg-body { overflow-y: auto; padding: 0 20px 20px; }
   .loading { padding: 48px 0; text-align: center; color: var(--secondary-text-color); }
   .hero { display: block; width: calc(100% + 40px); margin: 0 -20px; max-height: 360px; object-fit: cover; }
-  .desc { font-size: 15px; line-height: 1.5; margin: 16px 0 8px; }
+  .desc { font-size: 15px; line-height: 1.5; margin: 16px 0 8px; white-space: pre-line; }
   .meta { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
   .meta .chip { padding: 4px 12px; gap: 6px; }
   .meta ha-icon { --mdc-icon-size: 18px; color: var(--secondary-text-color); }

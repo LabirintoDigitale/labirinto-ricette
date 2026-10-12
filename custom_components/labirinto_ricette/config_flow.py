@@ -8,7 +8,7 @@ from homeassistant import config_entries
 from homeassistant.core import callback
 from homeassistant.helpers import config_validation as cv
 
-from .const import CONF_SITES, DEFAULT_SITES, DOMAIN
+from .const import CONF_SITES, CONF_SITES_VERSION, DEFAULT_SITES, DOMAIN, SITES_VERSION
 
 
 class LabirintoRicetteConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -21,7 +21,7 @@ class LabirintoRicetteConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             return self.async_create_entry(
                 title="Labirinto Ricette",
                 data={},
-                options={CONF_SITES: DEFAULT_SITES},
+                options={CONF_SITES: DEFAULT_SITES, CONF_SITES_VERSION: SITES_VERSION},
             )
         return self.async_show_form(step_id="user")
 
@@ -55,7 +55,9 @@ class LabirintoRicetteOptionsFlow(config_entries.OptionsFlow):
                 else:
                     new_sites.append({"name": name, "url": url, "enabled": True})
             if not errors:
-                return self.async_create_entry(title="", data={CONF_SITES: new_sites})
+                return self.async_create_entry(
+                    title="", data={**self.config_entry.options, CONF_SITES: new_sites}
+                )
 
         schema = vol.Schema(
             {

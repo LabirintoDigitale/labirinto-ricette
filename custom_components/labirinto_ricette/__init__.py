@@ -28,8 +28,11 @@ from .const import (
     CARD_URL,
     CONF_SHARE_TOKEN,
     CONF_SITES,
+    CONF_SITES_VERSION,
     DOMAIN,
+    NEW_SITES,
     OLD_SITE_URLS,
+    SITES_VERSION,
     PANEL_PATH,
     PANEL_URL,
     SIGNAL_UPDATE,
@@ -102,6 +105,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if CONF_SHARE_TOKEN not in entry.data:
         hass.config_entries.async_update_entry(
             entry, data={**entry.data, CONF_SHARE_TOKEN: secrets.token_urlsafe(16)}
+        )
+    version = entry.options.get(CONF_SITES_VERSION, 1)
+    if version < SITES_VERSION:
+        sites = list(entry.options.get(CONF_SITES, []))
+        names = {s["name"].casefold() for s in sites}
+        for v in range(version + 1, SITES_VERSION + 1):
+            sites += [s for s in NEW_SITES.get(v, []) if s["name"].casefold() not in names]
+        hass.config_entries.async_update_entry(
+            entry,
+            options={**entry.options, CONF_SITES: sites, CONF_SITES_VERSION: SITES_VERSION},
         )
     integration = await async_get_integration(hass, DOMAIN)
     await panel_custom.async_register_panel(
