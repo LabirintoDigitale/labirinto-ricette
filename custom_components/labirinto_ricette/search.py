@@ -138,10 +138,10 @@ async def _async_is_recipe(
 async def _async_only_recipes(
     hass: HomeAssistant, items: list[dict], limit: int, sem: asyncio.Semaphore
 ) -> list[dict]:
+    """Tiene solo le pagine che si possono aprire come ricetta (con ingredienti o
+    passaggi leggibili): newsletter, pubblicità, articoli e pagine non
+    raggiungibili mostrerebbero solo un messaggio vuoto."""
     if not items:
         return items
     checks = await asyncio.gather(*(_async_is_recipe(hass, i["url"], sem) for i in items))
-    if True not in checks:
-        # Il sito non pubblica i dati strutturati: non si possono distinguere
-        return items[:limit]
-    return [item for item, ok in zip(items, checks) if ok is not False][:limit]
+    return [item for item, ok in zip(items, checks) if ok is True][:limit]
