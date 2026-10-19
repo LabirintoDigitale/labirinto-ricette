@@ -74,6 +74,9 @@ const STYLE = `
   .nmeta { font-size: 12px; color: var(--secondary-text-color); }
   .nmeta .topic { font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--primary-color); }
   .s.nd { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .filters { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+  .filters select { flex: 1 1 200px; min-width: 0; padding: 10px 12px; font-size: 15px; border-radius: 8px;
+    border: 1px solid var(--divider-color); background: var(--card-background-color); color: var(--primary-text-color); }
   .nbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
   .dlg-foot { display: flex; justify-content: flex-end; padding: 12px 16px; border-top: 1px solid var(--divider-color); }
   .dlg-foot a.btn { text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
@@ -600,10 +603,52 @@ class LabirintoRicettePanel extends HTMLElement {
       main.append(el("div", { class: "empty", textContent: "Nessuna notizia." }));
       return;
     }
+    // Filtri come nella card: fonte e argomento (scelta ricordata nel browser)
+    if (this._newsSource === undefined) {
+      try {
+        const saved = JSON.parse(localStorage.getItem("labirinto-ricette-news") || "{}");
+        this._newsSource = saved.source || "all";
+        this._newsTopic = saved.topic || "all";
+      } catch (_e) {
+        this._newsSource = "all";
+        this._newsTopic = "all";
+      }
+    }
+    const count = (key) => {
+      const m = new Map();
+      for (const a of this._news) if (a[key]) m.set(a[key], (m.get(a[key]) || 0) + 1);
+      return [...m.entries()].sort((x, y) => x[0].localeCompare(y[0], "it"));
+    };
+    const sources = count("source");
+    const topics = count("topic");
+    if (!sources.some(([s]) => s === this._newsSource)) this._newsSource = "all";
+    if (!topics.some(([t]) => t === this._newsTopic)) this._newsTopic = "all";
+    const select = (all, entries, value, onChange) => {
+      const sel = el("select", {},
+        el("option", { value: "all", textContent: all }),
+        ...entries.map(([name, n]) => el("option", { value: name, textContent: `${name} (${n})` })));
+      sel.value = value;
+      sel.addEventListener("change", () => {
+        onChange(sel.value);
+        try {
+          localStorage.setItem("labirinto-ricette-news", JSON.stringify({ source: this._newsSource, topic: this._newsTopic }));
+        } catch (_e) { /* niente storage */ }
+        this._render();
+      });
+      return sel;
+    };
+    const shown = this._news.filter((a) =>
+      (this._newsSource === "all" || a.source === this._newsSource)
+      && (this._newsTopic === "all" || a.topic === this._newsTopic));
+    main.append(el("div", { class: "filters" },
+      select("Tutte le fonti", sources, this._newsSource, (v) => { this._newsSource = v; }),
+      select("Tutti gli argomenti", topics, this._newsTopic, (v) => { this._newsTopic = v; })));
     main.append(el("div", { class: "status nbar" },
-      el("span", { textContent: `${this._news.length} notizie` }), refresh));
+      el("span", { textContent: shown.length === this._news.length
+        ? `${shown.length} notizie` : `${shown.length} di ${this._news.length} notizie` }), refresh));
+    if (!shown.length) main.append(el("div", { class: "empty", textContent: "Nessuna notizia con questi filtri." }));
     const list = el("div", { class: "list" });
-    for (const a of this._news) {
+    for (const a of shown) {
       const item = el("a", { class: "item news", href: a.link, target: "_blank", rel: "noopener noreferrer" });
       item.addEventListener("click", (e) => {
         if (e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0) return;
