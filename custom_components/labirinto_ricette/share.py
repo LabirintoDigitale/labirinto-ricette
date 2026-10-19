@@ -15,7 +15,7 @@ from homeassistant.loader import async_get_integration
 
 from .const import CONF_SHARE_TOKEN, DOMAIN, PANEL_URL, SHARE_URL
 from .search import async_get_recipe, async_search, get_entry, get_sites, normalize
-from .news import async_articles, async_summary
+from .news import async_articles, async_news_available, async_summary
 from .todo import async_add_items, todo_lists
 
 APP_HTML = Path(__file__).parent / "www" / "app.html"
@@ -75,7 +75,14 @@ class ShareApiView(HomeAssistantView):
                 {"name": s["name"], "enabled": s.get("enabled", True)}
                 for s in get_sites(hass)
             ]
-            return self.json({"sites": sites, "defaults": [], "last": None})
+            return self.json(
+                {
+                    "sites": sites,
+                    "defaults": [],
+                    "last": None,
+                    "news": await async_news_available(hass),
+                }
+            )
         if action == "todo_lists":
             return self.json({"lists": todo_lists(hass)})
         if action in ("news", "news_summary"):

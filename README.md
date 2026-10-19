@@ -24,7 +24,7 @@ Dopo aver aggiunto l'integrazione compare la voce **Ricette** nella barra latera
 4. con **⚙ Siti** (solo amministratori) attivi/disattivi i siti, li rimuovi, ne aggiungi di nuovi e li provi con **Prova**.
 
 ### News
-Se in una dashboard c'è la card **RSS News** (`custom:rss-news-card`), la scheda **News** mostra le stesse notizie
+La scheda compare solo se in una dashboard c'è la card **RSS News** (`custom:rss-news-card`), la scheda **News** mostra le stesse notizie
 (dal suo sensore, di solito `sensor.news_aggregator`) e al tocco apre il riassunto tradotto preso dal `summarize.php`
 del server delle notizie. Non serve configurare nulla: entità, indirizzo del server e token vengono letti dalla card.
 La scheda è di sola lettura: niente impostazioni né blocco delle fonti (i percorsi già bloccati restano nascosti).

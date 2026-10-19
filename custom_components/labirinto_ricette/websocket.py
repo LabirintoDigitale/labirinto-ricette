@@ -16,7 +16,7 @@ from homeassistant.exceptions import HomeAssistantError
 from .const import CONF_SHARE_TOKEN, CONF_SITES, DEFAULT_SITES, DOMAIN, SHARE_URL
 from .scraper import async_search_site
 from .search import async_get_recipe, get_entry as _entry
-from .news import async_articles, async_summary
+from .news import async_articles, async_news_available, async_summary
 from .todo import async_add_items, todo_lists
 
 SITE_SCHEMA = vol.Schema(
@@ -59,8 +59,8 @@ def _share_path(token: str | None) -> str | None:
 
 
 @websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/config"})
-@callback
-def ws_config(
+@websocket_api.async_response
+async def ws_config(
     hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict
 ) -> None:
     """Siti configurati, siti predefiniti e ultima ricerca."""
@@ -72,6 +72,7 @@ def ws_config(
         "sites": entry.options.get(CONF_SITES, DEFAULT_SITES),
         "defaults": DEFAULT_SITES,
         "last": hass.data[DOMAIN].get("last"),
+        "news": await async_news_available(hass),
     }
     if connection.user.is_admin:
         result["share_path"] = _share_path(entry.data.get(CONF_SHARE_TOKEN))

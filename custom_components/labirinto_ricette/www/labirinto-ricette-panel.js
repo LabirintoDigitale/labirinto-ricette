@@ -182,6 +182,9 @@ class LabirintoRicettePanel extends HTMLElement {
       this._sites = cfg.sites || [];
       this._defaults = cfg.defaults || [];
       this._sharePath = cfg.share_path || null;
+      // Scheda News solo se c'è la card RSS News con il suo sensore
+      this._newsAvailable = !!cfg.news;
+      if (!this._newsAvailable && this._view === "news") this._view = "search";
       if (cfg.last && !this._results) {
         this._ingredients = cfg.last.ingredients || [];
         this._results = cfg.last.results || [];
@@ -239,7 +242,7 @@ class LabirintoRicettePanel extends HTMLElement {
       main.append(el("div", { class: "tabs" },
         tab("search", "mdi:fridge-outline", "Ingredienti"),
         tab("favorites", "mdi:heart", n ? `I miei preferiti (${n})` : "I miei preferiti"),
-        tab("news", "mdi:newspaper-variant-outline", "News")));
+        this._newsAvailable ? tab("news", "mdi:newspaper-variant-outline", "News") : null));
       if (this._view === "search") this._renderSearch(main);
       else if (this._view === "favorites") this._renderFavorites(main);
       else this._renderNews(main);

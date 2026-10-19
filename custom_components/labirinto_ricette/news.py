@@ -140,6 +140,16 @@ def _image(article: dict[str, Any]) -> str:
     return ""
 
 
+async def async_news_available(hass: HomeAssistant) -> bool:
+    """True se c'è la card RSS News in una dashboard e il suo sensore ha le notizie."""
+    try:
+        cfg = await async_card_config(hass)
+    except Exception:  # noqa: BLE001 - nel dubbio la scheda non si mostra
+        return False
+    state = hass.states.get(cfg["entity"])
+    return cfg["found"] and state is not None and isinstance(state.attributes.get("articles"), list)
+
+
 async def async_articles(hass: HomeAssistant) -> dict[str, Any]:
     cfg = await async_card_config(hass)
     state = hass.states.get(cfg["entity"])
