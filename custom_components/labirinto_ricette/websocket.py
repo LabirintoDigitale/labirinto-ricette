@@ -16,6 +16,7 @@ from homeassistant.exceptions import HomeAssistantError
 from .const import CONF_SHARE_TOKEN, CONF_SITES, DEFAULT_SITES, DOMAIN, SHARE_URL
 from .scraper import async_search_site
 from .search import async_get_recipe, get_entry as _entry
+from .news import async_articles, async_summary
 from .todo import async_add_items, todo_lists
 
 SITE_SCHEMA = vol.Schema(
@@ -49,6 +50,8 @@ def async_register(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, ws_favorites_remove)
     websocket_api.async_register_command(hass, ws_todo_lists)
     websocket_api.async_register_command(hass, ws_todo_add)
+    websocket_api.async_register_command(hass, ws_news_list)
+    websocket_api.async_register_command(hass, ws_news_summary)
 
 
 def _share_path(token: str | None) -> str | None:
@@ -270,3 +273,37 @@ async def ws_todo_add(
         connection.send_error(msg["id"], "add_failed", str(err))
         return
     connection.send_result(msg["id"], {"added": added})
+
+
+# ---------------------------------------------------------------------------
+# News (sola lettura)
+
+
+@websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/news/list"})
+@websocket_api.async_response
+async def ws_news_list(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict
+) -> None:
+    try:
+        connection.send_result(msg["id"], await async_articles(hass))
+    except HomeAssistantError as err:
+        connection.send_error(msg["id"], "news_failed", str(err))
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): f"{DOMAIN}/news/summary",
+        vol.Required("url"): str,
+        vol.Optional("retry", default=False): bool,
+    }
+)
+@websocket_api.async_response
+async def ws_news_summary(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict
+) -> None:
+    try:
+        connection.send_result(
+            msg["id"], await async_summary(hass, msg["url"], msg["retry"])
+        )
+    except HomeAssistantError as err:
+        connection.send_error(msg["id"], "summary_failed", str(err))

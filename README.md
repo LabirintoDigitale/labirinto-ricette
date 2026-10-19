@@ -23,6 +23,12 @@ Dopo aver aggiunto l'integrazione compare la voce **Ricette** nella barra latera
 3. tocca una ricetta: si apre una finestra con descrizione, tempi, ingredienti (in grassetto quelli che hai) e i passaggi con le foto. Il link **Apri sul sito** porta alla pagina originale (anche Ctrl+clic);
 4. con **⚙ Siti** (solo amministratori) attivi/disattivi i siti, li rimuovi, ne aggiungi di nuovi e li provi con **Prova**.
 
+### News
+Se in una dashboard c'è la card **RSS News** (`custom:rss-news-card`), la scheda **News** mostra le stesse notizie
+(dal suo sensore, di solito `sensor.news_aggregator`) e al tocco apre il riassunto tradotto preso dal `summarize.php`
+del server delle notizie. Non serve configurare nulla: entità, indirizzo del server e token vengono letti dalla card.
+La scheda è di sola lettura: niente impostazioni né blocco delle fonti (i percorsi già bloccati restano nascosti).
+
 ### Lista della spesa
 Nella finestra della ricetta spunta gli ingredienti che hai già e premi **Aggiungi alla lista**: scegli una delle
 tue liste delle attività (Casa, Shopping list…) e gli ingredienti **non spuntati** vengono aggiunti, con il nome della

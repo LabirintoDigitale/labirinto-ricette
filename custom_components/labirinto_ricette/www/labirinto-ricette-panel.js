@@ -58,7 +58,7 @@ const STYLE = `
   .msg.err { color: var(--error-color, #db4437); }
   .empty { text-align: center; padding: 32px 16px; color: var(--secondary-text-color); }
   .empty ha-icon { --mdc-icon-size: 48px; display: block; margin-bottom: 8px; }
-  .tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+  .tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
   .tab { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 20px; cursor: pointer;
     border: 1px solid var(--divider-color); background: var(--card-background-color); color: var(--primary-text-color);
     font-size: 14px; }
@@ -71,6 +71,18 @@ const STYLE = `
   button.btn ha-icon { --mdc-icon-size: 18px; vertical-align: -3px; }
   .heart.busy { animation: pulse 1s ease-in-out infinite; }
   @keyframes pulse { 50% { opacity: .35; } }
+  .nmeta { font-size: 12px; color: var(--secondary-text-color); }
+  .nmeta .topic { font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--primary-color); }
+  .s.nd { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .nbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .dlg-foot { display: flex; justify-content: flex-end; padding: 12px 16px; border-top: 1px solid var(--divider-color); }
+  .dlg-foot a.btn { text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+  ul.sum { margin: 12px 0 0; padding-left: 20px; font-size: 15px; line-height: 1.55; }
+  ul.sum li { margin-bottom: 10px; }
+  ul.sum.orig { font-style: italic; font-size: 14px; color: var(--secondary-text-color); }
+  .orig-title { margin-top: 16px; padding-top: 10px; border-top: 1px dashed var(--divider-color); font-size: 12px;
+    font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: var(--secondary-text-color); }
+  button.btn.small { padding: 2px 8px; font-size: 12px; }
   .overlay { position: fixed; inset: 0; z-index: 10; background: rgba(0,0,0,.5);
     display: flex; align-items: center; justify-content: center; padding: 24px; box-sizing: border-box; }
   .dlg { background: var(--card-background-color); color: var(--primary-text-color); border-radius: 16px;
@@ -82,7 +94,7 @@ const STYLE = `
   .x { background: none; border: 0; cursor: pointer; color: var(--secondary-text-color); padding: 8px;
     border-radius: 50%; display: flex; }
   .x:hover { background: var(--secondary-background-color); }
-  .dlg-body { overflow-y: auto; padding: 0 20px 20px; }
+  .dlg-body { flex: 1 1 auto; overflow-y: auto; padding: 0 20px 20px; }
   .loading { padding: 48px 0; text-align: center; color: var(--secondary-text-color); }
   .hero { display: block; width: calc(100% + 40px); margin: 0 -20px; max-height: 360px; object-fit: cover; }
   .desc { font-size: 15px; line-height: 1.5; margin: 16px 0 8px; white-space: pre-line; }
@@ -218,7 +230,7 @@ class LabirintoRicettePanel extends HTMLElement {
     const main = el("main");
     if (this._loadError) {
       main.append(el("div", { class: "box" }, el("div", { class: "msg err", textContent: "Errore: " + this._loadError })));
-    } else if (this._view === "search" || this._view === "favorites") {
+    } else if (this._view === "search" || this._view === "favorites" || this._view === "news") {
       const n = (this._favs || []).length;
       const tab = (view, icon, text) => el("button", {
         class: "tab" + (this._view === view ? " on" : ""),
@@ -226,9 +238,11 @@ class LabirintoRicettePanel extends HTMLElement {
       }, el("ha-icon", { icon }), text);
       main.append(el("div", { class: "tabs" },
         tab("search", "mdi:fridge-outline", "Ingredienti"),
-        tab("favorites", "mdi:heart", n ? `I miei preferiti (${n})` : "I miei preferiti")));
+        tab("favorites", "mdi:heart", n ? `I miei preferiti (${n})` : "I miei preferiti"),
+        tab("news", "mdi:newspaper-variant-outline", "News")));
       if (this._view === "search") this._renderSearch(main);
-      else this._renderFavorites(main);
+      else if (this._view === "favorites") this._renderFavorites(main);
+      else this._renderNews(main);
     } else {
       this._renderSettings(main);
     }
@@ -530,6 +544,149 @@ class LabirintoRicettePanel extends HTMLElement {
       el("div", { class: "row left" }, ...buttons,
         el("button", { class: "btn flat", textContent: "Annulla", onclick: () => box.replaceChildren() })),
       msg));
+  }
+
+  /* ---------- News (sola lettura, dalla card RSS News) ---------- */
+
+  async _loadNews() {
+    this._newsLoading = true;
+    try {
+      const r = await this._hass.callWS({ type: `${DOMAIN}/news/list` });
+      this._news = r.articles || [];
+      this._newsError = null;
+    } catch (err) {
+      this._newsError = err.message || String(err);
+    }
+    this._newsLoading = false;
+    this._newsAt = Date.now();
+    if (this._view === "news") this._render();
+  }
+
+  _newsDate(value) {
+    const d = new Date(value);
+    if (isNaN(d.getTime())) return value || "";
+    return d.toLocaleString("it-IT", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+  }
+
+  _newsMeta(a) {
+    const parts = [];
+    if (a.topic) parts.push(el("span", { class: "topic", textContent: a.topic }));
+    if (a.source && a.source.toLowerCase() !== (a.topic || "").toLowerCase()) parts.push(el("span", { textContent: a.source }));
+    if (a.pubDate) parts.push(el("span", { textContent: this._newsDate(a.pubDate) }));
+    const meta = el("div", { class: "nmeta" });
+    parts.forEach((p, i) => { if (i) meta.append(" · "); meta.append(p); });
+    return meta;
+  }
+
+  _renderNews(main) {
+    // Ricarica se mai caricate o se sono passati più di 2 minuti
+    if (!this._newsLoading && (!this._newsAt || Date.now() - this._newsAt > 120000)) this._loadNews();
+    const refresh = el("button", { class: "btn flat", onclick: () => { this._news = null; this._loadNews(); this._render(); } },
+      el("ha-icon", { icon: "mdi:refresh" }), " Aggiorna");
+    if (this._newsError) {
+      main.append(el("div", { class: "box" },
+        el("div", { class: "msg err", textContent: "Notizie non disponibili: " + this._newsError }),
+        el("div", { class: "row" }, refresh)));
+      return;
+    }
+    if (!this._news) {
+      main.append(el("div", { class: "empty", textContent: "Carico le notizie…" }));
+      return;
+    }
+    if (!this._news.length) {
+      main.append(el("div", { class: "empty", textContent: "Nessuna notizia." }));
+      return;
+    }
+    main.append(el("div", { class: "status nbar" },
+      el("span", { textContent: `${this._news.length} notizie` }), refresh));
+    const list = el("div", { class: "list" });
+    for (const a of this._news) {
+      const item = el("a", { class: "item news", href: a.link, target: "_blank", rel: "noopener noreferrer" });
+      item.addEventListener("click", (e) => {
+        if (e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0) return;
+        e.preventDefault();
+        this._openNews(a);
+      });
+      if (a.image) {
+        const img = el("img", { src: a.image, loading: "lazy", referrerPolicy: "no-referrer", alt: "" });
+        img.addEventListener("error", () => img.replaceWith(el("div", { class: "ph" })));
+        item.append(img);
+      } else {
+        item.append(el("div", { class: "ph" }));
+      }
+      item.append(el("div", { class: "info" },
+        this._newsMeta(a),
+        el("div", { class: "t", textContent: a.title }),
+        a.description ? el("div", { class: "s nd", textContent: a.description }) : null));
+      list.append(item);
+    }
+    main.append(list);
+  }
+
+  _langName(code) {
+    if (!code || code === "und" || code === "other") return "";
+    try {
+      const n = new Intl.DisplayNames(["it"], { type: "language" }).of(code);
+      if (n && n !== code) return n;
+    } catch (_e) { /* codice sconosciuto */ }
+    return code.toUpperCase();
+  }
+
+  _openNews(a) {
+    this._closeRecipe();
+    const body = el("div", { class: "dlg-body" });
+    const close = el("button", { class: "x", title: "Chiudi", onclick: () => this._closeRecipe() }, el("ha-icon", { icon: "mdi:close" }));
+    const dialog = el("div", { class: "dlg", role: "dialog", ariaModal: "true", ariaLabel: a.title },
+      el("div", { class: "dlg-head" }, el("div", { class: "dlg-title", textContent: a.title }), close),
+      body,
+      el("div", { class: "dlg-foot" },
+        el("a", { class: "btn flat link", href: a.link, target: "_blank", rel: "noopener noreferrer" },
+          el("ha-icon", { icon: "mdi:open-in-new" }), " Apri articolo")));
+    const overlay = el("div", { class: "overlay", onclick: (e) => { if (e.target === overlay) this._closeRecipe(); } }, dialog);
+    this._onKey = (e) => { if (e.key === "Escape") this._closeRecipe(); };
+    window.addEventListener("keydown", this._onKey);
+    this._overlay = overlay;
+    this.shadowRoot.append(overlay);
+    close.focus();
+
+    const head = [this._newsMeta(a)];
+    if (a.image) head.unshift(el("img", { class: "hero", src: a.image, referrerPolicy: "no-referrer", alt: "" }));
+    const load = async (retry = false) => {
+      body.replaceChildren(...head, el("div", { class: "loading", textContent: "Leggo l'articolo…" }));
+      let data;
+      try {
+        data = await this._hass.callWS({ type: `${DOMAIN}/news/summary`, url: a.link, retry });
+      } catch (err) {
+        if (this._overlay !== overlay) return;
+        body.replaceChildren(...head,
+          el("p", { class: "desc", textContent: "Riassunto non disponibile." }),
+          a.description ? el("p", { class: "hint", textContent: a.description }) : null,
+          el("p", { class: "hint", textContent: "Motivo: " + (err.message || err) }));
+        return;
+      }
+      if (this._overlay !== overlay) return;
+      const list = (items, cls) => el("ul", { class: "sum" + (cls ? " " + cls : "") },
+        ...(items || []).map((s) => el("li", { textContent: s })));
+      const out = [...head, list(data.sentences)];
+      const orig = Array.isArray(data.sentences_original) ? data.sentences_original : [];
+      if (data.translated && orig.length) {
+        const name = this._langName(data.lang);
+        out.push(el("div", { class: "orig-title", textContent: "Originale" + (name ? ` (${name})` : "") }), list(orig, "orig"));
+      }
+      const notes = [data.partial || data.source === "meta"
+        ? "C'era solo la descrizione pubblicata dal sito."
+        : "Riassunto automatico: le frasi principali dell'articolo."];
+      const failed = !data.translated && data.lang && data.lang !== "it" && !!data.translation_warning;
+      if (data.translated) notes.push("Tradotto automaticamente");
+      else if (failed) notes.push("Testo originale (traduzione non disponibile)");
+      out.push(el("p", { class: "hint", textContent: notes.join(" · ") }));
+      if (failed) {
+        out.push(el("p", { class: "hint" }, "Motivo: " + data.translation_warning + " ",
+          el("button", { class: "btn flat small", textContent: "Riprova la traduzione", onclick: () => load(true) })));
+      }
+      body.replaceChildren(...out);
+    };
+    load();
   }
 
   _closeRecipe() {

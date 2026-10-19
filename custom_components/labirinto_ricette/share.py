@@ -15,6 +15,7 @@ from homeassistant.loader import async_get_integration
 
 from .const import CONF_SHARE_TOKEN, DOMAIN, PANEL_URL, SHARE_URL
 from .search import async_get_recipe, async_search, get_entry, get_sites, normalize
+from .news import async_articles, async_summary
 from .todo import async_add_items, todo_lists
 
 APP_HTML = Path(__file__).parent / "www" / "app.html"
@@ -77,6 +78,17 @@ class ShareApiView(HomeAssistantView):
             return self.json({"sites": sites, "defaults": [], "last": None})
         if action == "todo_lists":
             return self.json({"lists": todo_lists(hass)})
+        if action in ("news", "news_summary"):
+            try:
+                if action == "news":
+                    return self.json(await async_articles(hass))
+                return self.json(
+                    await async_summary(
+                        hass, request.query.get("url", ""), request.query.get("retry") == "1"
+                    )
+                )
+            except HomeAssistantError as err:
+                return self.json_message(str(err), HTTPStatus.BAD_REQUEST)
         if action == "favorites":
             return self.json({"favorites": hass.data[DOMAIN]["favorites"].summaries()})
         if action == "favorite":

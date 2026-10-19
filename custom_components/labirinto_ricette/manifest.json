@@ -1,13 +1,25 @@
 {
   "domain": "labirinto_ricette",
   "name": "Labirinto Ricette",
-  "codeowners": ["@LabirintoDigitale"],
+  "after_dependencies": [
+    "lovelace"
+  ],
+  "codeowners": [
+    "@LabirintoDigitale"
+  ],
   "config_flow": true,
-  "dependencies": ["frontend", "http", "panel_custom", "websocket_api"],
+  "dependencies": [
+    "frontend",
+    "http",
+    "panel_custom",
+    "websocket_api"
+  ],
   "documentation": "https://github.com/LabirintoDigitale/labirinto-ricette",
   "integration_type": "service",
   "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/LabirintoDigitale/labirinto-ricette/issues",
-  "requirements": ["beautifulsoup4>=4.12"],
-  "version": "0.9.1"
+  "requirements": [
+    "beautifulsoup4>=4.12"
+  ],
+  "version": "0.10.0"
 }

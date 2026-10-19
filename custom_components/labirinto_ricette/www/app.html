@@ -79,6 +79,10 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
+      if (msg.type === "labirinto_ricette/news/list") return api("/news");
+      if (msg.type === "labirinto_ricette/news/summary") {
+        return api("/news_summary?url=" + encodeURIComponent(msg.url) + (msg.retry ? "&retry=1" : ""));
+      }
       if (msg.type === "labirinto_ricette/todo/lists") return api("/todo_lists");
       if (msg.type === "labirinto_ricette/todo/add") return post("/todo_add", msg);
       if (msg.type === "labirinto_ricette/favorites/list") return api("/favorites");
