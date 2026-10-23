@@ -76,3 +76,7 @@ strutturati JSON-LD, poi dai link con immagine). Non usa API ufficiali: se un si
 protezioni anti-bot o genera i risultati via JavaScript (può succedere con HelloFresh), potrebbe restituire pochi
 risultati o nessuno. Apri una issue indicando il sito. Rispetta i termini d'uso dei siti: i risultati
 rimandano sempre alla pagina originale.
+
+---
+
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/W4M829BGBC)
