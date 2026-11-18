@@ -67,7 +67,7 @@ class HaClient {
                     else -> {
                         val tmp = File(target.parentFile, target.name + ".part")
                         tmp.outputStream().use { out -> response.body!!.byteStream().copyTo(out) }
-                        if (!tmp.renameTo(target)) throw IOException("Cannot save $file")
+                        if (!tmp.renameTo(target)) throw IOException("Cannot save ${target.name}")
                         true
                     }
                 }
