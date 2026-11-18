@@ -38,6 +38,13 @@ data class SearchResult(val title: String, val url: String, val site: String, va
     }
 }
 
+/** A to-do list the ingredients can be added to (`todo/lists`). */
+data class TodoList(val entityId: String, val name: String) {
+    companion object {
+        fun fromJson(o: JSONObject) = TodoList(o.optString("entity_id"), o.optString("name"))
+    }
+}
+
 /**
  * Favorites from Home Assistant with a local copy (SQLite + image files), so the
  * saved recipes open even without a connection. Online it can also search sites,
@@ -271,6 +278,26 @@ class RecipeRepository(context: Context) {
         val wanted = db.load().flatMap { it.files }.toSet()
         imageDir.listFiles()?.forEach { if (it.name !in wanted) it.delete() }
     }
+
+    /** To-do lists that accept new items (online only). */
+    suspend fun todoLists(): List<TodoList> = withContext(Dispatchers.IO) {
+        val (_, _, res) = withServer { it.call("labirinto_ricette/todo/lists") }
+        val arr = (res as? JSONObject)?.optJSONArray("lists") ?: JSONArray()
+        (0 until arr.length()).mapNotNull {
+            arr.optJSONObject(it)?.let { o -> runCatching { TodoList.fromJson(o) }.getOrNull() }
+        }
+    }
+
+    /** Add [items] to a to-do list, with [note] as each item's note where supported. */
+    suspend fun todoAdd(entityId: String, items: List<String>, note: String): Int =
+        withContext(Dispatchers.IO) {
+            val params = JSONObject()
+                .put("entity_id", entityId)
+                .put("items", JSONArray(items))
+                .put("note", note)
+            val (_, _, res) = withServer { it.call("labirinto_ricette/todo/add", params, timeoutMs = 60_000) }
+            (res as? JSONObject)?.optInt("added") ?: 0
+        }
 
     /** Run [block] on the first base URL that answers; returns that URL and the token used too. */
     private suspend fun <T> withServer(block: suspend (HaClient.Session) -> T): Triple<String, String, T> {

@@ -85,7 +85,7 @@ fun FavoriteDetailScreen(
                 .verticalScroll(rememberScrollState()),
         ) {
             StatusBanner(state, onRetry = vm::refresh)
-            RecipeBody(fav.recipe, vm.repo, accent, Modifier.padding(16.dp))
+            RecipeBody(fav.recipe, vm, accent, Modifier.padding(16.dp))
         }
     }
 

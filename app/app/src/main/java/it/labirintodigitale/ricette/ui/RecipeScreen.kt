@@ -117,7 +117,7 @@ fun RecipeScreen(
         ) {
             StatusBanner(state, onRetry = vm::refresh)
             when {
-                recipe != null -> RecipeBody(recipe!!, vm.repo, accent, Modifier.padding(16.dp))
+                recipe != null -> RecipeBody(recipe!!, vm, accent, Modifier.padding(16.dp))
                 error != null -> Box(Modifier.fillMaxSize().padding(32.dp), Alignment.TopCenter) {
                     Text(error!!, textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.error)
                 }

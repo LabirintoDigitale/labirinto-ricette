@@ -66,4 +66,10 @@
     <string name="token_help">In Home Assistant: Profilo → Sicurezza → Token di accesso a lunga durata → Crea token.</string>
     <string name="username">Nome utente</string>
     <string name="welcome">Collega Home Assistant</string>
+    <string name="ingredients_tick_hint">Spunta gli ingredienti che hai già: gli altri si possono aggiungere alla lista della spesa.</string>
+    <string name="add_to_list">Aggiungi %1$d ingredienti alla lista</string>
+    <string name="choose_list">Scegli la lista</string>
+    <string name="no_lists">Nessuna lista delle attività disponibile in Home Assistant.</string>
+    <string name="last_used">ultima usata</string>
+    <string name="added_to_list">Aggiunti %1$d ingredienti a «%2$s».</string>
 </resources>

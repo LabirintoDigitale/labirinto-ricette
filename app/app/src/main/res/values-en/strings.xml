@@ -66,4 +66,10 @@
     <string name="token_help">In Home Assistant: Profile → Security → Long-lived access tokens → Create token.</string>
     <string name="username">Username</string>
     <string name="welcome">Connect Home Assistant</string>
+    <string name="ingredients_tick_hint">Tick the ingredients you already have: the rest can be added to a shopping list.</string>
+    <string name="add_to_list">Add %1$d ingredients to a list</string>
+    <string name="choose_list">Choose a list</string>
+    <string name="no_lists">No to-do lists available in Home Assistant.</string>
+    <string name="last_used">last used</string>
+    <string name="added_to_list">Added %1$d ingredients to “%2$s”.</string>
 </resources>

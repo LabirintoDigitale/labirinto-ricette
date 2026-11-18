@@ -10,6 +10,7 @@ import it.labirintodigitale.ricette.data.Favorite
 import it.labirintodigitale.ricette.data.HaException
 import it.labirintodigitale.ricette.data.RecipeRepository
 import it.labirintodigitale.ricette.data.SearchResult
+import it.labirintodigitale.ricette.data.TodoList
 import it.labirintodigitale.ricette.data.Settings
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -214,6 +215,24 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { s -> s.copy(favorites = s.favorites.filterNot { it.id == fav.id }) }
         onDone()
     }
+
+    // ---------- shopping list ----------
+
+    suspend fun todoLists(): Result<List<TodoList>> =
+        runCatching { repo.todoLists() }.recoverCatching { throw asMessage(it) }
+
+    private val lastListKey = "last_todo_list"
+    private val prefs = app.getSharedPreferences("ui", android.content.Context.MODE_PRIVATE)
+    fun lastList(): String? = prefs.getString(lastListKey, null)
+
+    /** Add [items] to a to-do list; shows a confirmation message. */
+    fun addToList(list: TodoList, items: List<String>, note: String, onBusy: (Boolean) -> Unit, onDone: () -> Unit) =
+        online(onBusy) {
+            val added = repo.todoAdd(list.entityId, items, note)
+            prefs.edit().putString(lastListKey, list.entityId).apply()
+            _state.update { it.copy(message = str(R.string.added_to_list, added, list.name)) }
+            onDone()
+        }
 
     private fun online(onBusy: (Boolean) -> Unit = {}, block: suspend () -> Unit) {
         if (!_state.value.canEdit) {
