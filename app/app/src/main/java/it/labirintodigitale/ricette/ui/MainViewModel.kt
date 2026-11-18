@@ -230,7 +230,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         online(onBusy) {
             val added = repo.todoAdd(list.entityId, items, note)
             prefs.edit().putString(lastListKey, list.entityId).apply()
-            _state.update { it.copy(message = str(R.string.added_to_list, added, list.name)) }
+            _state.update { it.copy(message = getApplication<Application>().getString(R.string.added_to_list, added, list.name)) }
             onDone()
         }
 
