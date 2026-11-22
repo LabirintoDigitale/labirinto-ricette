@@ -85,3 +85,10 @@ rimandano sempre alla pagina originale.
 ---
 
 [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/W4M829BGBC)
+
+## App Android
+
+Nella cartella [`app/`](app/README.md) c'è un'app Android che si collega a Home Assistant e usa questa
+integrazione, con una **copia locale** delle ricette preferite: senza rete si apre in **sola lettura** con le
+ricette salvate l'ultima volta, comoda ai fornelli. Online cerca ricette, le apre e salva i preferiti.
+
