@@ -37,6 +37,35 @@ def site_domain(url: str) -> str:
     return ".".join(_host(url).split(":")[0].split(".")[-2:])
 
 
+# Piattaforme di blog con più blog sullo stesso dominio, uno per cartella
+# (blog.giallozafferano.it/<blog>/): ogni blog è un sito a sé.
+MULTI_BLOG_HOSTS = {"blog.giallozafferano.it"}
+# Pagine dei blog WordPress che non sono articoli
+NOT_POST = re.compile(r"/(?:category|tag|author|page|feed|wp-content|wp-json|wp-admin|wp-login\.php)(?:/|$)")
+
+
+def _blog_prefix(url: str) -> str | None:
+    """"/allacciateilgrembiule/" per i blog ospitati in una cartella, altrimenti None."""
+    if _host(url).split(":")[0] not in MULTI_BLOG_HOSTS:
+        return None
+    first = urlparse(url).path.strip("/").split("/")[0]
+    return f"/{first}/" if first else None
+
+
+def resolve_search_url(url: str) -> str:
+    """URL di ricerca con {query} anche da un indirizzo qualsiasi del sito.
+
+    Per i blog (es. un blog di Giallo Zafferano o un blog WordPress) basta
+    incollare l'indirizzo del blog o di una sua ricetta: si usa la ricerca di
+    WordPress (?s=) del blog."""
+    url = url.strip()
+    if "{query}" in url or not url.startswith(("http://", "https://")):
+        return url
+    parsed = urlparse(url)
+    prefix = _blog_prefix(url) or "/"
+    return f"{parsed.scheme}://{parsed.netloc}{prefix}?s={{query}}"
+
+
 def _walk(node: Any):
     if isinstance(node, dict):
         if node.get("@type") == "BreadcrumbList":
@@ -124,6 +153,7 @@ def parse_results(html: str, base_url: str, limit: int) -> list[dict[str, str]]:
     """Estrae (titolo, link, immagine) da una pagina di risultati."""
     soup = BeautifulSoup(html, "html.parser")
     domain = site_domain(base_url)
+    blog = _blog_prefix(base_url)
 
     def norm(link: str | None) -> str | None:
         if not link:
@@ -132,6 +162,12 @@ def parse_results(html: str, base_url: str, limit: int) -> list[dict[str, str]]:
         parsed = urlparse(link)
         if parsed.scheme not in ("http", "https") or site_domain(link) != domain:
             return None
+        if blog:
+            # solo articoli dello stesso blog (non altri blog né il sito principale)
+            if _host(link) != _host(base_url) or not parsed.path.startswith(blog):
+                return None
+            if parsed.path == blog or NOT_POST.search(parsed.path[len(blog) - 1:]):
+                return None
         if parsed.path in ("", "/") or parsed.path.rstrip("/") == urlparse(base_url).path.rstrip("/"):
             return None
         return link
@@ -362,7 +398,7 @@ async def async_search_site(
     hass: HomeAssistant, site: dict[str, Any], query: str, limit: int
 ) -> list[dict[str, str]]:
     """Cerca su un singolo sito."""
-    url = site["url"].replace("{query}", quote_plus(query))
+    url = resolve_search_url(site["url"]).replace("{query}", quote_plus(query))
     if _is_hellofresh(url):
         items = await _async_search_hellofresh(hass, url, query, limit)
     elif _is_nutribees(url):

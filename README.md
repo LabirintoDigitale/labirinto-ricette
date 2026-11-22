@@ -9,6 +9,11 @@ passaggio.
 **Nutribees** (piatti pronti) viene cercato nel menu attuale: la scheda mostra descrizione, ingredienti dell'etichetta,
 allergeni e calorie, ma non i passaggi (sono piatti già pronti). Puoi attivarli/disattivarli e aggiungerne altri.
 
+**Blog di ricette** (es. i blog di Giallo Zafferano come `https://blog.giallozafferano.it/allacciateilgrembiule/`, o un
+blog WordPress): in **⚙ Siti → Aggiungi un sito** basta incollare l'indirizzo del blog o di una sua ricetta, senza
+`{query}`. Viene usata la ricerca del blog e dalla pagina principale le sue ricette compaiono insieme a quelle degli
+altri siti (per i blog di Giallo Zafferano solo le ricette di quel blog, non degli altri).
+
 ## Installazione con HACS
 1. HACS → menu ⋮ → **Repository personalizzati**.
 2. Incolla `https://github.com/LabirintoDigitale/labirinto-ricette`, categoria **Integrazione**.

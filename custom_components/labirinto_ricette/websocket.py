@@ -14,7 +14,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
 
 from .const import CONF_SHARE_TOKEN, CONF_SITES, DEFAULT_SITES, DOMAIN, SHARE_URL
-from .scraper import async_search_site
+from .scraper import async_search_site, resolve_search_url
 from .search import async_get_recipe, get_entry as _entry
 from .news import async_articles, async_news_available, async_summary
 from .todo import async_add_items, todo_lists
@@ -29,11 +29,11 @@ SITE_SCHEMA = vol.Schema(
 
 
 def _site_error(site: dict[str, Any]) -> str | None:
-    url = site["url"]
+    site["url"] = url = resolve_search_url(site["url"])
     if not url.startswith(("http://", "https://")):
         return f"{site['name']}: l'URL deve iniziare con http:// o https://"
     if "{query}" not in url:
-        return f"{site['name']}: l'URL deve contenere {{query}} al posto degli ingredienti"
+        return f"{site['name']}: indirizzo non valido"
     return None
 
 
@@ -156,7 +156,9 @@ async def ws_test_site(
             msg["id"], {"ok": False, "error": str(err) or type(err).__name__}
         )
         return
-    connection.send_result(msg["id"], {"ok": True, "count": len(items), "results": items})
+    connection.send_result(
+        msg["id"], {"ok": True, "count": len(items), "results": items, "url": site["url"]}
+    )
 
 
 @websocket_api.websocket_command(

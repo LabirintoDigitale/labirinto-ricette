@@ -14,7 +14,7 @@
     "step": {
       "init": {
         "title": "Recipe sites",
-        "description": "Enable, remove or add sites. In the URL use {query} where the ingredients go, e.g. {example}",
+        "description": "Enable, remove or add sites. In the URL use {query} where the ingredients go, e.g. {example}. For a blog (e.g. a Giallo Zafferano blog) just paste the address of the blog or one of its recipes.",
         "data": {
           "enabled": "Enabled sites",
           "remove": "Sites to remove",

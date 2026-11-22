@@ -872,15 +872,14 @@ class LabirintoRicettePanel extends HTMLElement {
     });
 
     const name = el("input", { type: "text", placeholder: "Nome, es. Fatto in casa da Benedetta" });
-    const url = el("input", { type: "text", placeholder: "https://www.sito.it/cerca/?q={query}", inputMode: "url" });
+    const url = el("input", { type: "text", placeholder: "https://www.sito.it/cerca/?q={query} oppure l'indirizzo di un blog", inputMode: "url" });
     const addMsg = el("div", { class: "msg" });
     const add = () => {
       const n = name.value.trim();
-      const u = url.value.trim();
+      const u = searchUrl(url.value);
       addMsg.className = "msg err";
       if (!n) return (addMsg.textContent = "Scrivi il nome del sito.");
       if (!/^https?:\/\//.test(u)) return (addMsg.textContent = "L'URL deve iniziare con https://");
-      if (!u.includes("{query}")) return (addMsg.textContent = "Metti {query} nell'URL al posto degli ingredienti.");
       if (this._draft.some((s) => s.name.toLowerCase() === n.toLowerCase())) return (addMsg.textContent = "Esiste già un sito con questo nome.");
       this._draft.push({ name: n, url: u, enabled: true });
       this._settingsMsg = { ok: true, text: `“${n}” aggiunto: premi Salva per confermare.` };
@@ -909,7 +908,7 @@ class LabirintoRicettePanel extends HTMLElement {
         el("h2", { textContent: "Aggiungi un sito" }),
         el("div", { class: "form" }, name, url),
         el("p", { class: "hint", textContent:
-          "Come trovare l'URL: cerca “pasta” sul sito, copia l'indirizzo della pagina dei risultati e sostituisci “pasta” con {query}." }),
+          "Come trovare l'URL: cerca “pasta” sul sito, copia l'indirizzo della pagina dei risultati e sostituisci “pasta” con {query}. Per un blog (es. un blog di Giallo Zafferano come blog.giallozafferano.it/allacciateilgrembiule/) basta incollare l'indirizzo del blog o di una sua ricetta: si usa la ricerca del blog." }),
         addMsg,
         el("div", { class: "row" },
           el("button", { class: "btn flat", textContent: "Prova", onclick: (e) => this._test(url.value.trim(), addMsg, e.currentTarget) }),
@@ -994,6 +993,24 @@ class LabirintoRicettePanel extends HTMLElement {
       this._settingsMsg = { ok: false, text: "Non salvato: " + (err.message || err) };
     }
     this._render();
+  }
+}
+
+// Stessa logica di resolve_search_url in scraper.py: da un indirizzo senza
+// {query} (blog o ricetta di un blog) ricava la ricerca WordPress del blog.
+function searchUrl(value) {
+  const u = value.trim();
+  if (u.includes("{query}") || !/^https?:\/\//.test(u)) return u;
+  try {
+    const p = new URL(u);
+    let prefix = "/";
+    if (p.hostname.replace(/^www\./, "") === "blog.giallozafferano.it") {
+      const first = p.pathname.split("/").filter(Boolean)[0];
+      if (first) prefix = `/${first}/`;
+    }
+    return `${p.protocol}//${p.host}${prefix}?s={query}`;
+  } catch (_e) {
+    return u;
   }
 }
 

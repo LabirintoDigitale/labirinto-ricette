@@ -9,6 +9,7 @@ from homeassistant.core import callback
 from homeassistant.helpers import config_validation as cv
 
 from .const import CONF_SITES, CONF_SITES_VERSION, DEFAULT_SITES, DOMAIN, SITES_VERSION
+from .scraper import resolve_search_url
 
 
 class LabirintoRicetteConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -46,7 +47,7 @@ class LabirintoRicetteOptionsFlow(config_entries.OptionsFlow):
                 if s["name"] not in remove
             ]
             name = user_input.get("new_name", "").strip()
-            url = user_input.get("new_url", "").strip()
+            url = resolve_search_url(user_input.get("new_url", ""))
             if name or url:
                 if not name or not url.startswith(("http://", "https://")) or "{query}" not in url:
                     errors["new_url"] = "invalid_site"
