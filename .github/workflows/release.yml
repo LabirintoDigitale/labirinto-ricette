@@ -39,15 +39,20 @@ jobs:
           VERSION=$(jq -r .version custom_components/labirinto_ricette/manifest.json)
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           if gh release view "v$VERSION" >/dev/null 2>&1; then
-            echo "v$VERSION already released"
-            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "release=true" >> "$GITHUB_OUTPUT"
+            if gh release view "v$VERSION" --json assets --jq '.assets[].name' | grep -qx LabirintoRicette.apk; then
+              echo "v$VERSION already released with the APK"
+              echo "exists=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "v$VERSION exists (created by hand?) without the APK: attaching it"
+            fi
           fi
 
       - name: Reuse the previous APK if the app has not changed
         id: apk
         if: steps.version.outputs.exists != 'true'
         run: |
-          PREV=$(gh release list --limit 50 --json tagName --jq '[.[].tagName | select(startswith("v"))][0] // ""')
+          PREV=$(gh release list --limit 50 --json tagName --jq '[.[].tagName | select(startswith("v") and . != "v${{ steps.version.outputs.version }}")][0] // ""')
           if [ -n "$PREV" ] && git rev-parse -q --verify "refs/tags/$PREV" >/dev/null \
              && git diff --quiet "$PREV" HEAD -- app/ \
              && gh release download "$PREV" --pattern LabirintoRicette.apk --dir "$RUNNER_TEMP"; then
@@ -82,13 +87,18 @@ jobs:
           ./gradlew --no-daemon assembleRelease
           cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/LabirintoRicette.apk"
 
-      - name: Create release
+      - name: Create the release or attach the APK
         if: steps.version.outputs.exists != 'true'
         env:
           VERSION: ${{ steps.version.outputs.version }}
+          RELEASE: ${{ steps.version.outputs.release }}
         run: |
           git log -1 --format=%B -- custom_components/labirinto_ricette/manifest.json \
             | grep -v -e '^Co-Authored-By:' -e '^Claude-Session:' > notes.md
           printf '\nApp Android: scarica LabirintoRicette.apk qui sotto.\n' >> notes.md
-          gh release create "v$VERSION" "$RUNNER_TEMP/LabirintoRicette.apk" \
-            --target "$GITHUB_SHA" --title "$VERSION" --notes-file notes.md --latest
+          if [ "$RELEASE" = "true" ]; then
+            gh release upload "v$VERSION" "$RUNNER_TEMP/LabirintoRicette.apk" --clobber
+          else
+            gh release create "v$VERSION" "$RUNNER_TEMP/LabirintoRicette.apk" \
+              --target "$GITHUB_SHA" --title "$VERSION" --notes-file notes.md --latest
+          fi
