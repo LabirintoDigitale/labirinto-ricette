@@ -2,7 +2,8 @@ name: Release
 
 # Pubblica la release dell'integrazione v<versione di manifest.json> quando
 # arriva su main e non ha ancora una release, con allegato l'APK dell'app
-# Android compilato dallo stesso commit. HACS offre gli aggiornamenti dalle
+# Android. L'APK viene ricompilato solo se app/ è cambiata dalla release
+# precedente; altrimenti si riallega quello della release precedente. HACS offre gli aggiornamenti dalle
 # release: per pubblicare (integrazione o app) basta alzare la versione in
 # manifest.json. Le vecchie release separate dell'app (app-v*) vengono tolte.
 
@@ -42,17 +43,31 @@ jobs:
             echo "exists=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - uses: actions/setup-java@v4
+      - name: Reuse the previous APK if the app has not changed
+        id: apk
         if: steps.version.outputs.exists != 'true'
+        run: |
+          PREV=$(gh release list --limit 50 --json tagName --jq '[.[].tagName | select(startswith("v"))][0] // ""')
+          if [ -n "$PREV" ] && git rev-parse -q --verify "refs/tags/$PREV" >/dev/null \
+             && git diff --quiet "$PREV" HEAD -- app/ \
+             && gh release download "$PREV" --pattern LabirintoRicette.apk --dir "$RUNNER_TEMP"; then
+            echo "App invariata da $PREV: riuso il suo APK"
+            echo "reused=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "App cambiata (o nessun APK precedente): la compilo"
+          fi
+
+      - uses: actions/setup-java@v4
+        if: steps.version.outputs.exists != 'true' && steps.apk.outputs.reused != 'true'
         with:
           distribution: temurin
           java-version: "17"
 
       - uses: gradle/actions/setup-gradle@v4
-        if: steps.version.outputs.exists != 'true'
+        if: steps.version.outputs.exists != 'true' && steps.apk.outputs.reused != 'true'
 
       - name: Build APK
-        if: steps.version.outputs.exists != 'true'
+        if: steps.version.outputs.exists != 'true' && steps.apk.outputs.reused != 'true'
         working-directory: app
         env:
           KEYSTORE_BASE64: ${{ secrets.BCC_KEYSTORE_BASE64 }}

@@ -32,7 +32,8 @@ Cambiando server o utente la copia locale viene cancellata e riscaricata.
 
 Il workflow **Android app** compila l'APK a ogni push che tocca `app/`: lo trovi negli *Artifacts* della run
 (Actions → Android app). L'APK pubblicato è allegato alla **release dell'integrazione** (`vX.Y.Z`): non ci sono
-release separate per l'app. Per pubblicare un'app nuova si alza la versione in `manifest.json` dell'integrazione.
+release separate per l'app. Per pubblicare un'app nuova si alza la versione in `manifest.json` dell'integrazione: l'APK viene ricompilato solo
+se `app/` è cambiata dalla release precedente, altrimenti viene riallegato quello già compilato.
 
 Senza chiave di firma l'APK è firmato con una chiave di debug temporanea, diversa a ogni build: per
 aggiornare bisogna disinstallare la versione precedente. Per aggiornamenti normali crea una chiave e aggiungi
