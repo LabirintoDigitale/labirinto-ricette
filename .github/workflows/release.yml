@@ -1,0 +1,79 @@
+name: Release
+
+# Pubblica la release dell'integrazione v<versione di manifest.json> quando
+# arriva su main e non ha ancora una release, con allegato l'APK dell'app
+# Android compilato dallo stesso commit. HACS offre gli aggiornamenti dalle
+# release: per pubblicare (integrazione o app) basta alzare la versione in
+# manifest.json. Le vecchie release separate dell'app (app-v*) vengono tolte.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0  # per le note della release
+
+      - name: Remove separate app releases
+        run: |
+          for tag in $(gh release list --limit 200 --json tagName --jq '.[].tagName | select(startswith("app-v"))'); do
+            gh release delete "$tag" --yes --cleanup-tag
+          done
+
+      - name: Read version
+        id: version
+        run: |
+          VERSION=$(jq -r .version custom_components/labirinto_ricette/manifest.json)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          if gh release view "v$VERSION" >/dev/null 2>&1; then
+            echo "v$VERSION already released"
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-java@v4
+        if: steps.version.outputs.exists != 'true'
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+        if: steps.version.outputs.exists != 'true'
+
+      - name: Build APK
+        if: steps.version.outputs.exists != 'true'
+        working-directory: app
+        env:
+          KEYSTORE_BASE64: ${{ secrets.BCC_KEYSTORE_BASE64 }}
+          BCC_KEYSTORE_PASSWORD: ${{ secrets.BCC_KEYSTORE_PASSWORD }}
+          BCC_KEY_ALIAS: ${{ secrets.BCC_KEY_ALIAS }}
+          BCC_KEY_PASSWORD: ${{ secrets.BCC_KEY_PASSWORD }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/bcc.jks"
+            export BCC_KEYSTORE_PATH="$RUNNER_TEMP/bcc.jks"
+          fi
+          ./gradlew --no-daemon assembleRelease
+          cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/LabirintoRicette.apk"
+
+      - name: Create release
+        if: steps.version.outputs.exists != 'true'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          git log -1 --format=%B -- custom_components/labirinto_ricette/manifest.json \
+            | grep -v -e '^Co-Authored-By:' -e '^Claude-Session:' > notes.md
+          printf '\nApp Android: scarica LabirintoRicette.apk qui sotto.\n' >> notes.md
+          gh release create "v$VERSION" "$RUNNER_TEMP/LabirintoRicette.apk" \
+            --target "$GITHUB_SHA" --title "$VERSION" --notes-file notes.md --latest
