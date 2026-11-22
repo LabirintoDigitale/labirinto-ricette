@@ -26,7 +26,7 @@ Dopo aver aggiunto l'integrazione compare la voce **Ricette** nella barra latera
 1. scrivi gli ingredienti che hai in frigo (separati da virgola o uno alla volta con **Invio**);
 2. premi **Cerca ricette**: sotto compare l'elenco delle ricette trovate, con foto e sito;
 3. tocca una ricetta: si apre una finestra con descrizione, tempi, ingredienti (in grassetto quelli che hai) e i passaggi con le foto. Il link **Apri sul sito** porta alla pagina originale (anche Ctrl+clic);
-4. con **⚙ Siti** (solo amministratori) attivi/disattivi i siti, li rimuovi, ne aggiungi di nuovi e li provi con **Prova**.
+4. con **⚙ Siti** (solo amministratori) attivi/disattivi i siti, li rimuovi e li provi con **Prova** (premi **Salva**); un sito nuovo con **Aggiungi** viene salvato subito.
 
 ### News
 La scheda **News** compare solo se in una dashboard c'è la card **RSS News** (`custom:rss-news-card`): mostra le stesse notizie

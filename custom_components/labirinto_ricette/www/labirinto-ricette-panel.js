@@ -874,16 +874,29 @@ class LabirintoRicettePanel extends HTMLElement {
     const name = el("input", { type: "text", placeholder: "Nome, es. Fatto in casa da Benedetta" });
     const url = el("input", { type: "text", placeholder: "https://www.sito.it/cerca/?q={query} oppure l'indirizzo di un blog", inputMode: "url" });
     const addMsg = el("div", { class: "msg" });
-    const add = () => {
+    // "Aggiungi" salva subito: prima restava solo nella bozza e si perdeva
+    // chiudendo la pagina senza premere Salva.
+    const add = async (btn) => {
       const n = name.value.trim();
       const u = searchUrl(url.value);
       addMsg.className = "msg err";
       if (!n) return (addMsg.textContent = "Scrivi il nome del sito.");
       if (!/^https?:\/\//.test(u)) return (addMsg.textContent = "L'URL deve iniziare con https://");
       if (this._draft.some((s) => s.name.toLowerCase() === n.toLowerCase())) return (addMsg.textContent = "Esiste già un sito con questo nome.");
-      this._draft.push({ name: n, url: u, enabled: true });
-      this._settingsMsg = { ok: true, text: `“${n}” aggiunto: premi Salva per confermare.` };
-      this._render();
+      btn.disabled = true;
+      addMsg.className = "msg";
+      addMsg.textContent = "Salvo…";
+      try {
+        const r = await this._hass.callWS({ type: `${DOMAIN}/sites/save`, sites: [...this._draft, { name: n, url: u, enabled: true }] });
+        this._sites = r.sites;
+        this._draft = r.sites.map((s) => ({ ...s, enabled: s.enabled !== false }));
+        this._settingsMsg = { ok: true, text: `“${n}” aggiunto e salvato.` };
+        this._render();
+      } catch (err) {
+        addMsg.className = "msg err";
+        addMsg.textContent = "Non salvato: " + (err.message || err);
+        btn.disabled = false;
+      }
     };
 
     const saveBtn = el("button", { class: "btn", textContent: "Salva", onclick: () => this._save(saveBtn) });
@@ -912,7 +925,7 @@ class LabirintoRicettePanel extends HTMLElement {
         addMsg,
         el("div", { class: "row" },
           el("button", { class: "btn flat", textContent: "Prova", onclick: (e) => this._test(url.value.trim(), addMsg, e.currentTarget) }),
-          el("button", { class: "btn", textContent: "Aggiungi", onclick: add }))),
+          el("button", { class: "btn", textContent: "Aggiungi", onclick: (e) => add(e.currentTarget) }))),
     );
     if (this._sharePath) main.append(this._shareBox());
   }
