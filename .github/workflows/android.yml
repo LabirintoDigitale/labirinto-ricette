@@ -1,9 +1,10 @@
 name: Android app
 
 on:
+  # su main l'APK lo compila il workflow Release, solo quando serve
   push:
-    branches:
-      - "**"
+    branches-ignore:
+      - main
     paths:
       - "app/**"
       - ".github/workflows/android.yml"
