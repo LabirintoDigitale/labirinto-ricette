@@ -105,6 +105,15 @@ const STYLE = `
   .meta .chip { padding: 4px 12px; gap: 6px; }
   .meta ha-icon { --mdc-icon-size: 18px; color: var(--secondary-text-color); }
   h3 { font-size: 17px; font-weight: 500; margin: 20px 0 8px; }
+  .notes-link { margin: 4px 0 8px; }
+  .notes-box h3 { scroll-margin-top: 8px; }
+  textarea.notes { display: block; width: 100%; box-sizing: border-box; min-height: 110px; resize: vertical;
+    padding: 10px 12px; border-radius: 8px; border: 1px solid var(--divider-color, #ccc);
+    background: var(--card-background-color, #fff); color: var(--primary-text-color); font: inherit; line-height: 1.45; }
+  textarea.notes:focus { outline: 2px solid var(--primary-color); outline-offset: -1px; }
+  .hint.err { color: var(--error-color, #c62828); }
+  .has-note { margin-left: 8px; white-space: nowrap; }
+  .has-note ha-icon { --mdc-icon-size: 14px; }
   ul.ingr { list-style: none; padding: 0; margin: 0; columns: 2 240px; column-gap: 24px; }
   ul.ingr li { break-inside: avoid; padding: 5px 0; font-size: 15px; }
   ul.ingr label { display: flex; gap: 10px; align-items: flex-start; cursor: pointer; }
@@ -431,7 +440,8 @@ class LabirintoRicettePanel extends HTMLElement {
     }
     a.append(el("div", { class: "info" },
       el("div", { class: "t", textContent: it.title }),
-      el("div", { class: "s", textContent: it.site })));
+      el("div", { class: "s" }, it.site || "",
+        it.has_note ? el("span", { class: "has-note", title: "Ha delle note" }, el("ha-icon", { icon: "mdi:note-text-outline" }), " note") : "")));
     return a;
   }
 
@@ -457,7 +467,7 @@ class LabirintoRicettePanel extends HTMLElement {
       const fav = favId || (this._favFor(it.url) || {}).id;
       if (fav) {
         const saved = await this._hass.callWS({ type: `${DOMAIN}/favorites/get`, fav_id: fav });
-        recipe = { ...saved.recipe, savedAt: saved.saved_at };
+        recipe = { ...saved.recipe, savedAt: saved.saved_at, favId: saved.id, note: saved.note || "" };
       } else {
         recipe = await this._hass.callWS({ type: `${DOMAIN}/recipe`, url: it.url });
       }
@@ -504,6 +514,8 @@ class LabirintoRicettePanel extends HTMLElement {
       btn.classList.remove("busy");
       paint();
       this._render(); // aggiorna contatore ed elenco preferiti sotto la finestra
+      // appena salvata nei preferiti: riapre la copia salvata, che ha le note
+      if (!fav && this._favFor(it.url) && this._overlay) this._openRecipe(it);
     });
     return btn;
   }
@@ -738,6 +750,8 @@ class LabirintoRicettePanel extends HTMLElement {
   }
 
   _closeRecipe() {
+    if (this._flushNote) this._flushNote(); // note scritte da meno di 1 s
+    this._flushNote = null;
     if (this._overlay) this._overlay.remove();
     this._overlay = null;
     if (this._onKey) window.removeEventListener("keydown", this._onKey);
@@ -752,6 +766,8 @@ class LabirintoRicettePanel extends HTMLElement {
 
   _recipeContent(r, it) {
     const out = [];
+    const notes = r.favId ? this._notesBox(r) : null;
+    if (notes) out.push(notes.link);
     const image = r.image || it.image;
     if (image) out.push(el("img", { class: "hero", src: image, referrerPolicy: "no-referrer", alt: "" }));
     if (r.description) out.push(el("p", { class: "desc", textContent: r.description }));
@@ -767,6 +783,7 @@ class LabirintoRicettePanel extends HTMLElement {
     if (!r.ingredients.length && !r.steps.length) {
       out.push(el("div", { class: "msg", textContent:
         "Questo sito non pubblica ingredienti e passaggi in un formato che riesco a leggere." }));
+      if (notes) out.push(notes.box);
       out.push(this._siteLink(r.url || it.url));
       return out;
     }
@@ -824,12 +841,59 @@ class LabirintoRicettePanel extends HTMLElement {
       }
       out.push(el("h3", { textContent: "Preparazione" }), ol);
     }
+    if (notes) out.push(notes.box);
     if (r.savedAt) {
       out.push(el("p", { class: "hint", textContent:
         "Salvata nei preferiti il " + new Date(r.savedAt).toLocaleDateString("it-IT") + ": testo e foto sono conservati in Home Assistant." }));
     }
     out.push(this._siteLink(r.url || it.url));
     return out;
+  }
+
+  /* Note personali di un preferito: area di testo in fondo alla ricetta,
+     salvata da sola mentre scrivi, e un link in cima che porta lì. */
+  _notesBox(r) {
+    const area = el("textarea", { class: "notes", rows: 4, value: r.note || "",
+      placeholder: "Le tue note: modifiche, dosi, com'è venuta, a chi è piaciuta…" });
+    const status = el("span", { class: "hint" });
+    const title = el("h3", { textContent: "Le mie note" });
+    const link = el("button", { class: "btn flat notes-link" });
+    const paintLink = () => link.replaceChildren(
+      el("ha-icon", { icon: area.value.trim() ? "mdi:note-text" : "mdi:note-plus-outline" }),
+      area.value.trim() ? " Note aggiunte" : " Aggiungi una nota");
+    paintLink();
+    link.addEventListener("click", () => {
+      title.scrollIntoView({ behavior: "smooth", block: "start" });
+      area.focus({ preventScroll: true });
+    });
+    let saved = r.note || "";
+    let timer = null;
+    const save = async () => {
+      clearTimeout(timer);
+      const text = area.value;
+      if (text.trim() === saved.trim()) return;
+      status.className = "hint";
+      status.textContent = "Salvo…";
+      try {
+        await this._hass.callWS({ type: `${DOMAIN}/favorites/note`, fav_id: r.favId, note: text });
+        saved = text;
+        status.textContent = "Note salvate.";
+        const f = (this._favs || []).find((x) => x.id === r.favId);
+        if (f) f.has_note = !!text.trim();
+      } catch (err) {
+        status.className = "hint err";
+        status.textContent = "Non salvate: " + (err.message || err);
+      }
+    };
+    area.addEventListener("input", () => {
+      paintLink();
+      status.textContent = "";
+      clearTimeout(timer);
+      timer = setTimeout(save, 1000);
+    });
+    area.addEventListener("blur", save);
+    this._flushNote = save;
+    return { link, box: el("div", { class: "notes-box" }, title, area, status) };
   }
 
   /* ---------- Impostazioni siti ---------- */

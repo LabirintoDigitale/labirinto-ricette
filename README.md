@@ -44,6 +44,10 @@ Nella finestra della ricetta tocca il **♥** in alto per salvarla in **I miei p
 completo e tutte le foto (in `config/labirinto_ricette/images`), così la ricetta resta disponibile anche se il sito
 la toglie o chiude. Toccando di nuovo il ♥ la ricetta e le sue foto vengono cancellate.
 
+In fondo a ogni preferito c'è l'area **Le mie note**: scrivi modifiche, dosi o com'è venuta, e le note si salvano da
+sole mentre scrivi. In cima alla ricetta il link **Note aggiunte** porta direttamente lì, e nell'elenco dei preferiti
+le ricette con note hanno l'icona 📝. Le note restano anche nel link diretto senza login.
+
 ### Link diretto (senza login)
 In **⚙ Siti** trovi il **link diretto al ricettario**: si apre senza entrare in Home Assistant (es. un tablet in
 cucina). Chi ha il link può solo cercare e leggere ricette. **Rigenera** crea un link nuovo e disattiva il vecchio.

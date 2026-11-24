@@ -89,6 +89,7 @@
       if (msg.type === "labirinto_ricette/favorites/get") return api("/favorite?id=" + encodeURIComponent(msg.fav_id));
       if (msg.type === "labirinto_ricette/favorites/add") return post("/favorite_add", msg);
       if (msg.type === "labirinto_ricette/favorites/remove") return post("/favorite_remove", { id: msg.fav_id });
+      if (msg.type === "labirinto_ricette/favorites/note") return post("/favorite_note", { id: msg.fav_id, note: msg.note });
       if (msg.type === "call_service" && msg.service === "search") {
         const response = await api("/search", {
           method: "POST",

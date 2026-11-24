@@ -128,7 +128,7 @@ class ShareApiView(HomeAssistantView):
             except HomeAssistantError as err:
                 return self.json_message(str(err), HTTPStatus.BAD_REQUEST)
             return self.json({"added": added})
-        if action in ("favorite_add", "favorite_remove"):
+        if action in ("favorite_add", "favorite_remove", "favorite_note"):
             return await self._favorite(hass, request, action)
         if action != "search":
             return _not_found()
@@ -151,6 +151,9 @@ class ShareApiView(HomeAssistantView):
             body = await request.json()
             if action == "favorite_remove":
                 await favorites.async_remove(str(body["id"]))
+                return self.json({})
+            if action == "favorite_note":
+                await favorites.async_set_note(str(body["id"]), str(body.get("note", "")))
                 return self.json({})
             fav = await favorites.async_add(
                 str(body["url"]),

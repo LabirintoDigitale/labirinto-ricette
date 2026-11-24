@@ -28,6 +28,7 @@ _LOGGER = logging.getLogger(__name__)
 
 IMG_URL = f"/api/{DOMAIN}/img"
 MAX_IMAGES = 60
+MAX_NOTE = 10000
 MAX_IMAGE_BYTES = 8 * 1024 * 1024
 EXTENSIONS = {
     "image/jpeg": ".jpg",
@@ -71,6 +72,7 @@ class Favorites:
                 "site": f["site"],
                 "image": f["recipe"].get("image", ""),
                 "saved_at": f["saved_at"],
+                "has_note": bool(f.get("note")),
             }
             for f in items
         ]
@@ -124,6 +126,17 @@ class Favorites:
             self.items[fid] = fav
             self._schedule_save()
             return fav
+
+    async def async_set_note(self, fid: str, note: str) -> None:
+        """Note personali della ricetta (testo libero)."""
+        async with self._lock:
+            fav = self.get(fid)
+            note = note.strip()[:MAX_NOTE]
+            if note:
+                fav["note"] = note
+            else:
+                fav.pop("note", None)
+            self._schedule_save()
 
     async def async_remove(self, fid: str) -> None:
         async with self._lock:

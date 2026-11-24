@@ -48,6 +48,7 @@ def async_register(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, ws_favorites_get)
     websocket_api.async_register_command(hass, ws_favorites_add)
     websocket_api.async_register_command(hass, ws_favorites_remove)
+    websocket_api.async_register_command(hass, ws_favorites_note)
     websocket_api.async_register_command(hass, ws_todo_lists)
     websocket_api.async_register_command(hass, ws_todo_add)
     websocket_api.async_register_command(hass, ws_news_list)
@@ -231,6 +232,25 @@ async def ws_favorites_add(
         connection.send_error(msg["id"], "save_failed", str(err))
         return
     connection.send_result(msg["id"], {"id": fav["id"]})
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): f"{DOMAIN}/favorites/note",
+        vol.Required("fav_id"): str,
+        vol.Required("note"): str,
+    }
+)
+@websocket_api.async_response
+async def ws_favorites_note(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict
+) -> None:
+    try:
+        await _favorites(hass).async_set_note(msg["fav_id"], msg["note"])
+    except HomeAssistantError as err:
+        connection.send_error(msg["id"], "not_found", str(err))
+        return
+    connection.send_result(msg["id"], {})
 
 
 @websocket_api.websocket_command(
