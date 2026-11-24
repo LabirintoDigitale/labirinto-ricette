@@ -10,7 +10,23 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.OpenInBrowser
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInParent
+import kotlinx.coroutines.launch
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -78,14 +94,33 @@ fun FavoriteDetailScreen(
         },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
+        val scroll = rememberScrollState()
+        val scope = rememberCoroutineScope()
+        var notesY by remember { mutableIntStateOf(0) }
         Column(
             Modifier
                 .padding(padding)
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState()),
+                .verticalScroll(scroll),
         ) {
             StatusBanner(state, onRetry = vm::refresh)
+            // In cima: porta direttamente alle note in fondo alla ricetta
+            if (fav.note.isNotBlank() || state.canEdit) {
+                TextButton(
+                    onClick = { scope.launch { scroll.animateScrollTo(notesY) } },
+                    modifier = Modifier.padding(start = 8.dp, top = 4.dp),
+                ) {
+                    Icon(Icons.Filled.EditNote, null, Modifier.size(20.dp))
+                    Text("  " + stringResource(if (fav.note.isNotBlank()) R.string.notes_added else R.string.add_note))
+                }
+            }
             RecipeBody(fav.recipe, vm, accent, Modifier.padding(16.dp))
+            NotesSection(
+                fav, state, vm,
+                Modifier
+                    .padding(start = 16.dp, end = 16.dp, bottom = 24.dp)
+                    .onGloballyPositioned { notesY = it.positionInParent().y.toInt() },
+            )
         }
     }
 
@@ -104,5 +139,38 @@ fun FavoriteDetailScreen(
                 TextButton(onClick = { confirmRemove = false }) { Text(stringResource(R.string.cancel)) }
             },
         )
+    }
+}
+
+/** "Le mie note": personal notes of the favorite, saved on Home Assistant (online only). */
+@Composable
+private fun NotesSection(fav: Favorite, state: UiState, vm: MainViewModel, modifier: Modifier = Modifier) {
+    var text by rememberSaveable(fav.id, fav.note) { mutableStateOf(fav.note) }
+    var busy by remember { mutableStateOf(false) }
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(stringResource(R.string.my_notes), style = MaterialTheme.typography.titleMedium)
+        OutlinedTextField(
+            value = text,
+            onValueChange = { text = it },
+            readOnly = !state.canEdit,
+            placeholder = { Text(stringResource(R.string.notes_hint)) },
+            minLines = 4,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        if (state.canEdit) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
+                if (busy) CircularProgressIndicator(Modifier.size(20.dp).padding(end = 8.dp), strokeWidth = 2.dp)
+                Button(
+                    onClick = { vm.saveNote(fav, text, onBusy = { busy = it }) },
+                    enabled = !busy && text.trim() != fav.note.trim(),
+                ) { Text(stringResource(R.string.save_notes)) }
+            }
+        } else {
+            Text(
+                stringResource(R.string.notes_offline),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }

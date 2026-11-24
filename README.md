@@ -46,7 +46,8 @@ la toglie o chiude. Toccando di nuovo il ♥ la ricetta e le sue foto vengono ca
 
 In fondo a ogni preferito c'è l'area **Le mie note**: scrivi modifiche, dosi o com'è venuta, e le note si salvano da
 sole mentre scrivi. In cima alla ricetta il link **Note aggiunte** porta direttamente lì, e nell'elenco dei preferiti
-le ricette con note hanno l'icona 📝. Le note restano anche nel link diretto senza login.
+le ricette con note hanno l'icona 📝. Le note restano anche nel link diretto senza login, e nell'app Android
+(dalla versione 1.2), dove senza connessione si possono leggere.
 
 ### Link diretto (senza login)
 In **⚙ Siti** trovi il **link diretto al ricettario**: si apre senza entrare in Home Assistant (es. un tablet in

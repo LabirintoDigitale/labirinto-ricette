@@ -18,6 +18,7 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
@@ -186,8 +187,17 @@ private fun FavoriteTile(fav: Favorite, vm: MainViewModel, onClick: () -> Unit) 
                     overflow = TextOverflow.Ellipsis,
                     style = MaterialTheme.typography.bodyMedium,
                 )
-                if (fav.site.isNotBlank()) {
-                    Text(fav.site, color = Color.White.copy(alpha = 0.85f), style = MaterialTheme.typography.labelSmall)
+                if (fav.site.isNotBlank() || fav.note.isNotBlank()) {
+                    androidx.compose.foundation.layout.Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (fav.note.isNotBlank()) {
+                            Icon(
+                                androidx.compose.material.icons.Icons.Filled.EditNote, null,
+                                tint = Color.White.copy(alpha = 0.85f),
+                                modifier = Modifier.size(14.dp).padding(end = 2.dp),
+                            )
+                        }
+                        Text(fav.site, color = Color.White.copy(alpha = 0.85f), style = MaterialTheme.typography.labelSmall)
+                    }
                 }
             }
         }

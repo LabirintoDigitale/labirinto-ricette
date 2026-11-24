@@ -72,4 +72,11 @@
     <string name="no_lists">Nessuna lista delle attività disponibile in Home Assistant.</string>
     <string name="last_used">ultima usata</string>
     <string name="added_to_list">Aggiunti %1$d ingredienti a «%2$s».</string>
+    <string name="my_notes">Le mie note</string>
+    <string name="notes_added">Note aggiunte</string>
+    <string name="add_note">Aggiungi una nota</string>
+    <string name="notes_hint">Modifiche, dosi, com\'è venuta, a chi è piaciuta…</string>
+    <string name="save_notes">Salva note</string>
+    <string name="notes_saved">Note salvate.</string>
+    <string name="notes_offline">Senza connessione le note si possono solo leggere.</string>
 </resources>

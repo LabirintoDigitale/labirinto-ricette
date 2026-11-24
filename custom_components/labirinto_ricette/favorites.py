@@ -73,6 +73,8 @@ class Favorites:
                 "image": f["recipe"].get("image", ""),
                 "saved_at": f["saved_at"],
                 "has_note": bool(f.get("note")),
+                # testo delle note: l'app Android le sincronizza da qui
+                "note": f.get("note", ""),
             }
             for f in items
         ]

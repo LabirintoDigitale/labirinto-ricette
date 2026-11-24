@@ -80,7 +80,13 @@ data class Favorite(
     val files: List<String>,
     val recipe: Recipe,
     val raw: JSONObject,
+    /** Personal notes written in Home Assistant or in the app. */
+    val note: String = "",
 ) {
+    /** Same favorite with new notes (also in [raw], which is what the local copy stores). */
+    fun withNote(text: String): Favorite =
+        copy(note = text, raw = JSONObject(raw.toString()).put("note", text))
+
     companion object {
         fun fromJson(o: JSONObject) = Favorite(
             id = o.getString("id"),
@@ -91,6 +97,7 @@ data class Favorite(
             files = o.optJSONArray("files").toStringList(),
             recipe = Recipe.fromJson(o.getJSONObject("recipe")),
             raw = o,
+            note = o.optString("note"),
         )
     }
 }

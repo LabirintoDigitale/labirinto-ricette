@@ -72,4 +72,11 @@
     <string name="no_lists">No to-do lists available in Home Assistant.</string>
     <string name="last_used">last used</string>
     <string name="added_to_list">Added %1$d ingredients to “%2$s”.</string>
+    <string name="my_notes">My notes</string>
+    <string name="notes_added">Notes added</string>
+    <string name="add_note">Add a note</string>
+    <string name="notes_hint">Changes, amounts, how it turned out, who liked it…</string>
+    <string name="save_notes">Save notes</string>
+    <string name="notes_saved">Notes saved.</string>
+    <string name="notes_offline">Offline, notes are read-only.</string>
 </resources>

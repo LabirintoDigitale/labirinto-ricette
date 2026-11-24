@@ -200,6 +200,18 @@ class RecipeRepository(context: Context) {
         val serverIds = summaries.map { it.id }.toSet()
         val known = db.ids()
 
+        // The recipe is a fixed snapshot, but notes change: update them from the list
+        // (sent by integration 0.12.1+; older versions have no "note" field).
+        val notes = (0 until arr.length()).mapNotNull { i ->
+            arr.optJSONObject(i)?.takeIf { it.has("note") && it.has("id") }?.let { it.getString("id") to it.optString("note") }
+        }.toMap()
+        if (notes.isNotEmpty()) {
+            for (local in db.load()) {
+                val note = notes[local.id] ?: continue
+                if (note != local.note) db.upsert(local.withNote(note))
+            }
+        }
+
         // Saved recipes are immutable snapshots: fetch only the ones not downloaded yet.
         for (summary in summaries) {
             if (summary.id in known) continue
@@ -253,6 +265,14 @@ class RecipeRepository(context: Context) {
         db.upsert(fav)
         pruneImages()
         fav
+    }
+
+    /** Save the personal notes of a favorite on the server and in the local copy. */
+    suspend fun setNote(fav: Favorite, note: String) = withContext(Dispatchers.IO) {
+        withServer {
+            it.call("labirinto_ricette/favorites/note", JSONObject().put("fav_id", fav.id).put("note", note))
+        }
+        db.upsert(fav.withNote(note.trim()))
     }
 
     suspend fun removeFavorite(id: String) = withContext(Dispatchers.IO) {

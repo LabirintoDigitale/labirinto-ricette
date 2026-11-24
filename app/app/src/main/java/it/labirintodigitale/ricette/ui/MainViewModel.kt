@@ -210,6 +210,12 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         onDone(fav)
     }
 
+    fun saveNote(fav: Favorite, note: String, onBusy: (Boolean) -> Unit) = online(onBusy) {
+        repo.setNote(fav, note)
+        reloadFavorites()
+        _state.update { it.copy(message = str(R.string.notes_saved)) }
+    }
+
     fun removeFavorite(fav: Favorite, onDone: () -> Unit) = online {
         repo.removeFavorite(fav.id)
         _state.update { s -> s.copy(favorites = s.favorites.filterNot { it.id == fav.id }) }
