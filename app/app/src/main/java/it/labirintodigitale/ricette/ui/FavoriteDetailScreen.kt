@@ -27,6 +27,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInParent
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
+import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -100,6 +104,8 @@ fun FavoriteDetailScreen(
         Column(
             Modifier
                 .padding(padding)
+                .consumeWindowInsets(padding)
+                .imePadding() // la tastiera non copre le note: la pagina si accorcia sopra di lei
                 .fillMaxSize()
                 .verticalScroll(scroll),
         ) {
@@ -117,7 +123,9 @@ fun FavoriteDetailScreen(
             RecipeBody(fav.recipe, vm, accent, Modifier.padding(16.dp))
             NotesSection(
                 fav, state, vm,
-                Modifier
+                // toccando le note: aspetta che la tastiera sia aperta e scorre fino in fondo
+                onFocus = { scope.launch { delay(350); scroll.animateScrollTo(scroll.maxValue) } },
+                modifier = Modifier
                     .padding(start = 16.dp, end = 16.dp, bottom = 24.dp)
                     .onGloballyPositioned { notesY = it.positionInParent().y.toInt() },
             )
@@ -144,7 +152,13 @@ fun FavoriteDetailScreen(
 
 /** "Le mie note": personal notes of the favorite, saved on Home Assistant (online only). */
 @Composable
-private fun NotesSection(fav: Favorite, state: UiState, vm: MainViewModel, modifier: Modifier = Modifier) {
+private fun NotesSection(
+    fav: Favorite,
+    state: UiState,
+    vm: MainViewModel,
+    onFocus: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     var text by rememberSaveable(fav.id, fav.note) { mutableStateOf(fav.note) }
     var busy by remember { mutableStateOf(false) }
     Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -155,7 +169,9 @@ private fun NotesSection(fav: Favorite, state: UiState, vm: MainViewModel, modif
             readOnly = !state.canEdit,
             placeholder = { Text(stringResource(R.string.notes_hint)) },
             minLines = 4,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .onFocusChanged { if (it.isFocused) onFocus() },
         )
         if (state.canEdit) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
