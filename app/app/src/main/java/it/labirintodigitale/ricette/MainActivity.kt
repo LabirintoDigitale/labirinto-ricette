@@ -80,6 +80,31 @@ private fun App(vm: MainViewModel) {
 
     BackHandler(enabled = stack.size > 1) { pop() }
 
+    // Nuova versione dell'app disponibile in Home Assistant
+    state.update?.let { info ->
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { if (!state.updating) vm.skipUpdate() },
+            title = { androidx.compose.material3.Text(androidx.compose.ui.res.stringResource(R.string.update_title)) },
+            text = {
+                androidx.compose.material3.Text(
+                    androidx.compose.ui.res.stringResource(
+                        if (state.updating) R.string.update_downloading else R.string.update_text, info.versionName,
+                    ),
+                )
+            },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = vm::installUpdate, enabled = !state.updating) {
+                    androidx.compose.material3.Text(androidx.compose.ui.res.stringResource(R.string.update_install))
+                }
+            },
+            dismissButton = {
+                androidx.compose.material3.TextButton(onClick = vm::skipUpdate, enabled = !state.updating) {
+                    androidx.compose.material3.Text(androidx.compose.ui.res.stringResource(R.string.update_later))
+                }
+            },
+        )
+    }
+
     if (state.mode == Mode.SETUP && screen != Screen.Settings) {
         SettingsScreen(vm, firstRun = true, onDone = {}, onBack = null)
         return

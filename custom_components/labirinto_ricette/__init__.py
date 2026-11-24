@@ -37,6 +37,7 @@ from .const import (
     PANEL_URL,
     SIGNAL_UPDATE,
 )
+from .app_update import AppApkView, AppUpdate
 from .search import async_search, normalize
 
 PLATFORMS = ["sensor"]
@@ -68,6 +69,9 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     await favorites.async_load()
     hass.data[DOMAIN]["favorites"] = favorites
     hass.http.register_view(ImageView(favorites))
+    app_update = AppUpdate(hass)
+    hass.data[DOMAIN]["app"] = app_update
+    hass.http.register_view(AppApkView(app_update))
     websocket.async_register(hass)
     share.async_register(hass)
 

@@ -61,3 +61,13 @@ Serve l'Android SDK (Android Studio). Dalla cartella `app/`:
 - È ammesso HTTP in chiaro e sono accettati i certificati CA installati dall'utente, per gli Home Assistant
   raggiungibili solo in LAN o con certificato autofirmato.
 - Requisiti: Android 8.0 o superiore, integrazione Labirinto Ricette installata e configurata.
+
+## Aggiornamenti dall'app
+
+Dalla versione 1.2 l'app controlla, quando è collegata, se Home Assistant ha una versione più nuova (l'integrazione
+scarica l'APK dalla propria release su GitHub e lo tiene in `config/labirinto_ricette/app`). Se c'è, propone
+**Aggiorna**: scarica l'APK da Home Assistant e apre l'installazione di Android. La prima volta Android chiede di
+consentire all'app di installare app. L'APK si scarica anche dal pannello: **⚙ Siti → App Android → Scarica l'app**.
+
+Perché l'aggiornamento si installi sopra la versione precedente, gli APK devono essere firmati sempre con la stessa
+chiave (secrets `BCC_KEYSTORE_*` del repository, vedi sopra).

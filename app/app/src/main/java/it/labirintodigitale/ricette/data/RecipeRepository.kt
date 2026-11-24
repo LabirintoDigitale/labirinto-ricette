@@ -38,6 +38,9 @@ data class SearchResult(val title: String, val url: String, val site: String, va
     }
 }
 
+/** App version offered by the integration (`labirinto_ricette/app/info`). */
+data class AppInfo(val versionCode: Int, val versionName: String, val apkPath: String)
+
 /** A to-do list the ingredients can be added to (`todo/lists`). */
 data class TodoList(val entityId: String, val name: String) {
     companion object {
@@ -224,6 +227,38 @@ class RecipeRepository(context: Context) {
         db.markSynced(System.currentTimeMillis())
         pruneImages()
         db.load()
+    }
+
+    // ---------- app update (APK served by the integration) ----------
+
+    /** Version of the app offered by Home Assistant, or null if the integration has none. */
+    suspend fun appInfo(): AppInfo? = withContext(Dispatchers.IO) {
+        val (_, _, res) = runCatching { withServer { it.call("labirinto_ricette/app/info") } }.getOrNull()
+            ?: return@withContext null
+        (res as? JSONObject)?.let {
+            AppInfo(it.optInt("version_code"), it.optString("version_name"), it.optString("apk_path"))
+        }?.takeIf { it.versionCode > 0 && it.apkPath.startsWith("/") }
+    }
+
+    /** Download the APK offered by Home Assistant into [target]. */
+    suspend fun downloadApk(info: AppInfo, target: File): Unit = withContext(Dispatchers.IO) {
+        target.parentFile?.mkdirs()
+        val urls = (listOfNotNull(workingUrl) + settings.urls).distinct()
+        var last: Exception? = null
+        for (url in urls) {
+            try {
+                if (!client.download(url, info.apkPath, accessToken(url), target)) {
+                    throw HaException("not_found", "APK not found in Home Assistant")
+                }
+                return@withContext
+            } catch (e: HaException) {
+                throw e
+            } catch (e: Exception) {
+                currentCoroutineContext().ensureActive()
+                last = e
+            }
+        }
+        throw last ?: IllegalStateException("No URL")
     }
 
     /** Search recipes by ingredients (online only). */

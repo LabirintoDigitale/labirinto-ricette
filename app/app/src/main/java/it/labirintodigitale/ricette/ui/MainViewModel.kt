@@ -6,6 +6,7 @@ import android.net.Network
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import it.labirintodigitale.ricette.R
+import it.labirintodigitale.ricette.data.AppInfo
 import it.labirintodigitale.ricette.data.Favorite
 import it.labirintodigitale.ricette.data.HaException
 import it.labirintodigitale.ricette.data.RecipeRepository
@@ -27,6 +28,10 @@ data class UiState(
     val syncing: Boolean = false,
     val offlineReason: String? = null,
     val message: String? = null,
+    /** A newer app version is available in Home Assistant. */
+    val update: AppInfo? = null,
+    /** Download progress of the update: true while downloading. */
+    val updating: Boolean = false,
 ) {
     val canEdit: Boolean get() = mode == Mode.ONLINE
 }
@@ -77,6 +82,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 _state.update {
                     it.copy(favorites = favs, mode = Mode.ONLINE, lastSync = repo.lastSync(), offlineReason = null)
                 }
+                checkUpdate()
             } catch (e: Exception) {
                 goOffline(e)
             } finally {
@@ -90,6 +96,56 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun consumeMessage() = _state.update { it.copy(message = null) }
+
+    // ---------- app update ----------
+
+    private val updatePrefs = app.getSharedPreferences("update", android.content.Context.MODE_PRIVATE)
+
+    private fun installedVersion(): Long {
+        val ctx = getApplication<Application>()
+        return runCatching {
+            androidx.core.content.pm.PackageInfoCompat.getLongVersionCode(
+                ctx.packageManager.getPackageInfo(ctx.packageName, 0),
+            )
+        }.getOrDefault(Long.MAX_VALUE)
+    }
+
+    private suspend fun checkUpdate() {
+        val info = repo.appInfo() ?: return
+        val skipped = updatePrefs.getInt("skipped", 0)
+        if (info.versionCode > installedVersion() && info.versionCode != skipped) {
+            _state.update { it.copy(update = info) }
+        }
+    }
+
+    /** "Più tardi": do not ask again for this version. */
+    fun skipUpdate() {
+        _state.value.update?.let { updatePrefs.edit().putInt("skipped", it.versionCode).apply() }
+        _state.update { it.copy(update = null) }
+    }
+
+    /** Download the new APK from Home Assistant and open the system installer. */
+    fun installUpdate() {
+        val info = _state.value.update ?: return
+        viewModelScope.launch {
+            _state.update { it.copy(updating = true) }
+            val ctx = getApplication<Application>()
+            val file = java.io.File(java.io.File(ctx.cacheDir, "update"), "LabirintoRicette.apk")
+            try {
+                repo.downloadApk(info, file)
+                val uri = androidx.core.content.FileProvider.getUriForFile(ctx, ctx.packageName + ".files", file)
+                val intent = android.content.Intent(android.content.Intent.ACTION_VIEW)
+                    .setDataAndType(uri, "application/vnd.android.package-archive")
+                    .addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION or android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                ctx.startActivity(intent)
+                _state.update { it.copy(update = null) }
+            } catch (e: Exception) {
+                _state.update { it.copy(message = str(R.string.update_failed) + " " + describe(e)) }
+            } finally {
+                _state.update { it.copy(updating = false) }
+            }
+        }
+    }
 
     // ---------- settings / login ----------
 

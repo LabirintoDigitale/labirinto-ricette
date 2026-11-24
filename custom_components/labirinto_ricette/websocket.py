@@ -49,6 +49,7 @@ def async_register(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, ws_favorites_add)
     websocket_api.async_register_command(hass, ws_favorites_remove)
     websocket_api.async_register_command(hass, ws_favorites_note)
+    websocket_api.async_register_command(hass, ws_app_info)
     websocket_api.async_register_command(hass, ws_todo_lists)
     websocket_api.async_register_command(hass, ws_todo_add)
     websocket_api.async_register_command(hass, ws_news_list)
@@ -330,3 +331,17 @@ async def ws_news_summary(
         )
     except HomeAssistantError as err:
         connection.send_error(msg["id"], "summary_failed", str(err))
+
+
+@websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/app/info"})
+@websocket_api.async_response
+async def ws_app_info(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict
+) -> None:
+    """Versione dell'app Android disponibile in Home Assistant (per l'aggiornamento)."""
+    try:
+        info = await hass.data[DOMAIN]["app"].async_info()
+    except Exception as err:  # noqa: BLE001 - GitHub non raggiungibile o senza app
+        connection.send_error(msg["id"], "unavailable", str(err) or type(err).__name__)
+        return
+    connection.send_result(msg["id"], info)

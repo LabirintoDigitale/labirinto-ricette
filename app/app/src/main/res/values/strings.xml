@@ -79,4 +79,10 @@
     <string name="save_notes">Salva note</string>
     <string name="notes_saved">Note salvate.</string>
     <string name="notes_offline">Senza connessione le note si possono solo leggere.</string>
+    <string name="update_title">Nuova versione dell\'app</string>
+    <string name="update_text">In Home Assistant c\'è la versione %1$s di Labirinto Ricette. Vuoi scaricarla e installarla?</string>
+    <string name="update_downloading">Scarico la versione %1$s da Home Assistant…</string>
+    <string name="update_install">Aggiorna</string>
+    <string name="update_later">Più tardi</string>
+    <string name="update_failed">Aggiornamento non riuscito:</string>
 </resources>

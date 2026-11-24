@@ -40,7 +40,7 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           if gh release view "v$VERSION" >/dev/null 2>&1; then
             echo "release=true" >> "$GITHUB_OUTPUT"
-            if gh release view "v$VERSION" --json assets --jq '.assets[].name' | grep -qx LabirintoRicette.apk; then
+            if gh release view "v$VERSION" --json assets --jq '.assets[].name' | grep -qx app.json; then
               echo "v$VERSION already released with the APK"
               echo "exists=true" >> "$GITHUB_OUTPUT"
             else
@@ -55,7 +55,8 @@ jobs:
           PREV=$(gh release list --limit 50 --json tagName --jq '[.[].tagName | select(startswith("v") and . != "v${{ steps.version.outputs.version }}")][0] // ""')
           if [ -n "$PREV" ] && git rev-parse -q --verify "refs/tags/$PREV" >/dev/null \
              && git diff --quiet "$PREV" HEAD -- app/ \
-             && gh release download "$PREV" --pattern LabirintoRicette.apk --dir "$RUNNER_TEMP"; then
+             && gh release download "$PREV" --pattern LabirintoRicette.apk --pattern app.json --dir "$RUNNER_TEMP" \
+             && [ -s "$RUNNER_TEMP/app.json" ]; then
             echo "App invariata da $PREV: riuso il suo APK"
             echo "reused=true" >> "$GITHUB_OUTPUT"
           else
@@ -86,6 +87,11 @@ jobs:
           fi
           ./gradlew --no-daemon assembleRelease
           cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/LabirintoRicette.apk"
+          # Versione dell'app: l'integrazione la usa per proporre l'aggiornamento
+          CODE=$(grep -oP 'versionCode\s*=\s*\K[0-9]+' app/build.gradle.kts)
+          NAME=$(grep -oP 'versionName\s*=\s*"\K[^"]+' app/build.gradle.kts)
+          jq -n --argjson c "$CODE" --arg n "$NAME" '{version_code: $c, version_name: $n}' > "$RUNNER_TEMP/app.json"
+          cat "$RUNNER_TEMP/app.json"
 
       - name: Create the release or attach the APK
         if: steps.version.outputs.exists != 'true'
@@ -97,8 +103,8 @@ jobs:
             | grep -v -e '^Co-Authored-By:' -e '^Claude-Session:' > notes.md
           printf '\nApp Android: scarica LabirintoRicette.apk qui sotto.\n' >> notes.md
           if [ "$RELEASE" = "true" ]; then
-            gh release upload "v$VERSION" "$RUNNER_TEMP/LabirintoRicette.apk" --clobber
+            gh release upload "v$VERSION" "$RUNNER_TEMP/LabirintoRicette.apk" "$RUNNER_TEMP/app.json" --clobber
           else
-            gh release create "v$VERSION" "$RUNNER_TEMP/LabirintoRicette.apk" \
+            gh release create "v$VERSION" "$RUNNER_TEMP/LabirintoRicette.apk" "$RUNNER_TEMP/app.json" \
               --target "$GITHUB_SHA" --title "$VERSION" --notes-file notes.md --latest
           fi

@@ -991,7 +991,37 @@ class LabirintoRicettePanel extends HTMLElement {
           el("button", { class: "btn flat", textContent: "Prova", onclick: (e) => this._test(url.value.trim(), addMsg, e.currentTarget) }),
           el("button", { class: "btn", textContent: "Aggiungi", onclick: (e) => add(e.currentTarget) }))),
     );
+    main.append(this._appBox());
     if (this._sharePath) main.append(this._shareBox());
+  }
+
+  /* App Android: l'APK è servito da Home Assistant (link firmato, valido 5 minuti). */
+  _appBox() {
+    const info = el("p", { class: "hint", textContent: "Controllo la versione…" });
+    const msg = el("div", { class: "msg" });
+    const btn = el("button", { class: "btn", disabled: true }, el("ha-icon", { icon: "mdi:android" }), " Scarica l'app");
+    this._hass.callWS({ type: `${DOMAIN}/app/info` }).then((r) => {
+      info.textContent = `Versione ${r.version_name}. Installala sul telefono Android; quando esce una versione nuova è l'app stessa a proporti l'aggiornamento.`;
+      btn.disabled = false;
+      btn.onclick = async () => {
+        btn.disabled = true;
+        msg.className = "msg";
+        msg.textContent = "Preparo il download…";
+        try {
+          const signed = await this._hass.callWS({ type: "auth/sign_path", path: r.apk_path, expires: 300 });
+          location.href = signed.path;
+          msg.textContent = "";
+        } catch (err) {
+          msg.className = "msg err";
+          msg.textContent = "Errore: " + (err.message || err);
+        }
+        btn.disabled = false;
+      };
+    }).catch((err) => {
+      info.textContent = "App non disponibile: " + (err.message || err);
+    });
+    return el("div", { class: "box" },
+      el("h2", { textContent: "App Android" }), info, msg, el("div", { class: "row" }, btn));
   }
 
   _shareBox() {
