@@ -6,6 +6,7 @@ import android.net.Network
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import it.labirintodigitale.ricette.R
+import it.labirintodigitale.ricette.UpdateInstaller
 import it.labirintodigitale.ricette.data.AppInfo
 import it.labirintodigitale.ricette.data.Favorite
 import it.labirintodigitale.ricette.data.HaException
@@ -132,12 +133,21 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             val ctx = getApplication<Application>()
             val file = java.io.File(java.io.File(ctx.cacheDir, "update"), "LabirintoRicette.apk")
             try {
+                // Prima il permesso: concederlo riavvia l'app, quindi niente download a metà
+                if (!UpdateInstaller.canInstall(ctx)) {
+                    UpdateInstaller.openPermissionSettings(ctx)
+                    _state.update { it.copy(message = str(R.string.update_allow)) }
+                    return@launch
+                }
                 repo.downloadApk(info, file)
-                val uri = androidx.core.content.FileProvider.getUriForFile(ctx, ctx.packageName + ".files", file)
-                val intent = android.content.Intent(android.content.Intent.ACTION_VIEW)
-                    .setDataAndType(uri, "application/vnd.android.package-archive")
-                    .addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION or android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-                ctx.startActivity(intent)
+                val version = UpdateInstaller.apkVersion(ctx, file)
+                if (version != info.versionCode.toLong()) {
+                    file.delete()
+                    throw IllegalStateException(str(R.string.update_invalid))
+                }
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    UpdateInstaller.install(ctx, file)
+                }
                 _state.update { it.copy(update = null) }
             } catch (e: Exception) {
                 _state.update { it.copy(message = str(R.string.update_failed) + " " + describe(e)) }

@@ -85,4 +85,6 @@
     <string name="update_install">Aggiorna</string>
     <string name="update_later">Più tardi</string>
     <string name="update_failed">Aggiornamento non riuscito:</string>
+    <string name="update_allow">Consenti a Labirinto Ricette di installare app, poi torna qui e premi di nuovo Aggiorna.</string>
+    <string name="update_invalid">il file scaricato non è un APK valido di questa versione.</string>
 </resources>

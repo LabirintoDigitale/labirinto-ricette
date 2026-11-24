@@ -85,4 +85,6 @@
     <string name="update_install">Update</string>
     <string name="update_later">Later</string>
     <string name="update_failed">Update failed:</string>
+    <string name="update_allow">Allow Labirinto Ricette to install apps, then come back and tap Update again.</string>
+    <string name="update_invalid">the downloaded file is not a valid APK of this version.</string>
 </resources>
