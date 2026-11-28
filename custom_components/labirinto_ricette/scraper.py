@@ -25,7 +25,11 @@ HEADERS = {
 }
 
 # Testi alternativi delle immagini che non sono titoli
-GENERIC_TITLES = {"immagine", "image", "foto", "photo", "img", "video", "ricetta", "leggi"}
+GENERIC_TITLES = {
+    "immagine", "image", "foto", "photo", "img", "video", "ricetta", "leggi",
+    "leggi tutto", "leggi di più", "continua a leggere", "scopri di più", "vai alla ricetta",
+    "read more", "continue reading",
+}
 
 
 def _host(url: str) -> str:
@@ -182,6 +186,12 @@ def parse_results(html: str, base_url: str, limit: int) -> list[dict[str, str]]:
         heading = a.find(["h1", "h2", "h3", "h4"])
         for candidate in (
             heading.get_text(" ", strip=True) if heading else None,
+            # foto e titolo nello stesso link, titolo in grassetto o in un paragrafo
+            # (es. Contemporaneo Food: <a><p><strong>Titolo</strong></p><img alt="image">)
+            *(
+                el.get_text(" ", strip=True)
+                for el in (a.find_all(["strong", "b", "p"]) if a.find("img") else [])
+            ),
             None if a.find("img") else a.get_text(" ", strip=True),
             a.get("title"),
             a.get("aria-label"),
